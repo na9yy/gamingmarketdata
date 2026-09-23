@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gaming Market Trends</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0e14; --panel: #141925; --panel-2: #1b2130; --border: #262d3d;
+      --text: #e6e9ef; --muted: #8a93a6; --accent: #5b8cff; --up: #35c78a; --down: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    header { padding: 28px 24px 16px; border-bottom: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+    header h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
+    header .meta { color: var(--muted); font-size: 13px; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 22px; }
+    .tab { background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+      padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 13px; transition: all .15s ease; }
+    .tab:hover { color: var(--text); }
+    .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+    .card .top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+    .card .kw { font-size: 15px; font-weight: 600; }
+    .card .seg { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .card .val { font-size: 22px; font-weight: 700; }
+    .card .delta { font-size: 12px; margin-left: 6px; }
+    .delta.up { color: var(--up); } .delta.down { color: var(--down); }
+    .chart-box { height: 120px; margin-top: 6px; }
+    .section-title { font-size: 16px; margin: 26px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .empty, .error { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+      padding: 40px; text-align: center; color: var(--muted); }
+    .error { color: var(--down); }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎮 Gaming Market Trends</h1>
+    <div class="meta" id="meta">Loading…</div>
+  </header>
+  <div class="wrap">
+    <div class="tabs" id="tabs"></div>
+    <div id="content"></div>
+  </div>
+  <script>
+    const DATA_URL = "data/trends.json";
+    let DATA = null, activeSegment = "All";
+    const charts = [];
+    function fmtDate(iso) { try { return new Date(iso).toLocaleString(); } catch { return iso; } }
+    function trend(points) {
+      if (!points || points.length < 2) return { delta: null, dir: "flat" };
+      const first = points[0].value, last = points[points.length - 1].value;
+      if (first == null || last == null) return { delta: null, dir: "flat" };
+      const delta = last - first;
+      return { delta, dir: delta > 0 ? "up" : delta < 0 ? "down" : "flat" };
+    }
+    function destroyCharts() { while (charts.length) { const c = charts.pop(); try { c.destroy(); } catch {} } }
+    function keywordCard(item) {
+      const { keyword, segment, latest, points } = item;
+      const t = trend(points);
+      const deltaStr = t.delta == null ? "" :
+        `<span class="delta ${t.dir}">${t.delta > 0 ? "▲" : t.delta < 0 ? "▼" : "▬"} ${Math.abs(t.delta)}</span>`;
+      const id = "c_" + Math.random().toString(36).slice(2);
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="top">
+          <div><div class="kw">${keyword}</div><div class="seg">${segment || ""}</div></div>
+          <div class="val">${latest ?? "—"}${deltaStr}</div>
+        </div>
+        <div class="chart-box"><canvas id="${id}"></canvas></div>`;
+      setTimeout(() => renderChart(id, points, t.dir), 0);
+      return card;
+    }
+    function renderChart(id, points, dir) {
+      const el = document.getElementById(id);
+      if (!el || !points || !points.length) return;
+      const color = dir === "down" ? "#ff6b6b" : "#35c78a";
+      const ctx = el.getContext("2d");
+      const grad = ctx.createLinearGradient(0, 0, 0, 120);
+      grad.addColorStop(0, color + "55"); grad.addColorStop(1, color + "00");
+      charts.push(new Chart(ctx, {
+        type: "line",
+        data: { labels: points.map(p => p.date), datasets: [{
+          data: points.map(p => p.value), borderColor: color, backgroundColor: grad,
+          borderWidth: 2, fill: true, pointRadius: 0, tension: 0.25 }] },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
+          scales: { x: { display: false }, y: { display: false, beginAtZero: true } } },
+      }));
+    }
+    function render() {
+      destroyCharts();
+      const content = document.getElementById("content");
+      content.innerHTML = "";
+      if (!DATA || !DATA.segments || !DATA.segments.length) {
+        content.innerHTML = '<div class="empty">No trend data yet. The daily workflow will populate this.</div>';
+        return;
+      }
+      const segments = activeSegment === "All" ? DATA.segments
+        : DATA.segments.filter(s => s.name === activeSegment);
+      for (const seg of segments) {
+        const title = document.createElement("div");
+        title.className = "section-title"; title.textContent = seg.name;
+        content.appendChild(title);
+        const grid = document.createElement("div"); grid.className = "grid";
+        for (const kw of (seg.keywords || [])) grid.appendChild(keywordCard({ ...kw, segment: seg.name }));
+        content.appendChild(grid);
+      }
+    }
+    function renderTabs() {
+      const tabs = document.getElementById("tabs");
+      tabs.innerHTML = "";
+      const names = ["All", ...DATA.segments.map(s => s.name)];
+      for (const name of names) {
+        const b = document.createElement("button");
+        b.className = "tab" + (name === activeSegment ? " active" : "");
+        b.textContent = name;
+        b.onclick = () => { activeSegment = name; renderTabs(); render(); };
+        tabs.appendChild(b);
+      }
+    }
+    async function load() {
+      try {
+        const res = await fetch(DATA_URL + "?t=" + Date.now());
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        DATA = await res.json();
+        document.getElementById("meta").textContent = "Updated " + fmtDate(DATA.generatedAt);
+        renderTabs(); render();
+      } catch (e) {
+        document.getElementById("meta").textContent = "";
+        document.getElementById("content").innerHTML =
+          '<div class="error">Could not load ' + DATA_URL + ' — ' + e.message +
+          '.<br/>Make sure the file exists in the repo (the n8n workflow commits it daily).</div>';
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
