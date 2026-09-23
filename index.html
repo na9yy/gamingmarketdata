@@ -337,22 +337,32 @@
       });
     }
 
-    async function load() {
-      try {
-        const res = await fetch(DATA_URL + "?t=" + Date.now());
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        DATA = await res.json();
-        document.getElementById("meta").textContent = "Updated " + fmtDate(DATA.generatedAt);
-        GRID = buildGrid();
-        ITEMS = buildItems();
-        readHash(); bindControls(); update();
-      } catch (e) {
-        document.getElementById("meta").textContent = "";
-        document.getElementById("content").innerHTML =
-          '<div class="error">Could not load ' + DATA_URL + ' — ' + esc(e.message) +
-          '.<br/>Make sure the file exists in the repo (the n8n workflow commits it daily).</div>';
-      }
-    }
+  async function load() {
+  try {
+    const files = [
+      ["Accounts", "data/accounts.json"],
+      ["Currencies", "data/currencies.json"],
+      ["Top Ups", "data/topups.json"],
+    ];
+    const results = await Promise.all(files.map(async ([name, url]) => {
+      const res = await fetch(url + "?t=" + Date.now());
+      if (!res.ok) throw new Error(url + " HTTP " + res.status);
+      return [name, await res.json()];
+    }));
+    DATA = {
+      generatedAt: results.map(([, d]) => d.generatedAt).sort().pop(),
+      segments: results.map(([name, d]) => ({ name, keywords: d.items || [] })),
+    };
+    document.getElementById("meta").textContent = "Updated " + fmtDate(DATA.generatedAt);
+    GRID = buildGrid();
+    ITEMS = buildItems();
+    readHash(); bindControls(); update();
+  } catch (e) {
+    document.getElementById("meta").textContent = "";
+    document.getElementById("content").innerHTML =
+      '<div class="error">Could not load data: ' + esc(e.message) + '</div>';
+  }
+}
     load();
   </script>
 </body>
