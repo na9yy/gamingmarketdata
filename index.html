@@ -157,14 +157,19 @@
     }
 
     function sortFn(a, b) {
-      const ca = a.s.change ?? -Infinity, cb = b.s.change ?? -Infinity;
-      switch (state.sort) {
-        case "change_asc": return (a.s.change ?? Infinity) - (b.s.change ?? Infinity);
-        case "recent_desc": return b.s.recent - a.s.recent;
-        case "az": return a.keyword.localeCompare(b.keyword);
-        default: return cb - ca;
-      }
-    }
+  // Tier: 0 = real data, 1 = low data, 2 = zero in the window (always last)
+  const tier = i => i.s.status !== "low" ? 0 : (i.s.recent > 0 || i.s.base > 0) ? 1 : 2;
+  const t = tier(a) - tier(b);
+  if (t !== 0) return t;
+
+  const cmp = (x, y) => (x === y ? 0 : x > y ? 1 : -1);
+  switch (state.sort) {
+    case "change_asc":  return cmp(a.s.change ?? Infinity, b.s.change ?? Infinity);
+    case "recent_desc": return b.s.recent - a.s.recent;
+    case "az":          return a.keyword.localeCompare(b.keyword);
+    default:            return cmp(b.s.change ?? -Infinity, a.s.change ?? -Infinity);
+  }
+}
 
     function fmtChange(s) {
       if (s.status === "breakout") return "New";
