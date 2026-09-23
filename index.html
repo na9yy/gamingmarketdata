@@ -9,6 +9,7 @@
     :root {
       --bg: #0b0e14; --panel: #141925; --panel-2: #1b2130; --border: #262d3d;
       --text: #e6e9ef; --muted: #8a93a6; --accent: #5b8cff; --up: #35c78a; --down: #ff6b6b;
+      --new: #f5b945; --flat: #8a93a6;
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--text);
@@ -18,25 +19,50 @@
     header h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
     header .meta { color: var(--muted); font-size: 13px; }
     .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 24px 60px; }
-    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 22px; }
-    .tab { background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 14px; }
+    .tab, .chip { background: var(--panel); border: 1px solid var(--border); color: var(--muted);
       padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 13px; transition: all .15s ease; }
-    .tab:hover { color: var(--text); }
+    .tab:hover, .chip:hover { color: var(--text); }
     .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .tab:focus-visible, .chip:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* filter bar */
+    .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+      background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px; margin-bottom: 8px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { background: var(--panel-2); padding: 6px 12px; }
+    .chip .n { opacity: .7; margin-left: 4px; }
+    .chip.active[data-s="all"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .chip.active[data-s="rising"] { background: var(--up); border-color: var(--up); color: #06130d; }
+    .chip.active[data-s="breakout"] { background: var(--new); border-color: var(--new); color: #1a1204; }
+    .chip.active[data-s="falling"] { background: var(--down); border-color: var(--down); color: #1a0606; }
+    .chip.active[data-s="stable"], .chip.active[data-s="low"] { background: var(--muted); border-color: var(--muted); color: #0b0e14; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+    select, input[type="search"] { background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+    input[type="search"] { width: 180px; }
+    .hint { color: var(--muted); font-size: 12px; margin: 0 2px 14px; }
+
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
     .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
-    .card .top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+    .card .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
     .card .kw { font-size: 15px; font-weight: 600; }
-    .card .seg { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
-    .card .val { font-size: 22px; font-weight: 700; }
-    .card .delta { font-size: 12px; margin-left: 6px; }
-    .delta.up { color: var(--up); } .delta.down { color: var(--down); }
-    .chart-box { height: 120px; margin-top: 6px; }
+    .card .seg { font-size: 11px; color: var(--muted); letter-spacing: .3px; margin-top: 2px; }
+    .card .val { font-size: 22px; font-weight: 700; text-align: right; white-space: nowrap; }
+    .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; margin-top: 4px; }
+    .badge.rising { background: #35c78a22; color: var(--up); }
+    .badge.breakout { background: #f5b94522; color: var(--new); }
+    .badge.falling { background: #ff6b6b22; color: var(--down); }
+    .badge.stable, .badge.low { background: #8a93a622; color: var(--muted); }
+    .sub { font-size: 12px; color: var(--muted); }
+    .chart-box { height: 110px; margin-top: 8px; }
     .section-title { font-size: 16px; margin: 26px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .section-title .n { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 6px; }
     .empty, .error { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
       padding: 40px; text-align: center; color: var(--muted); }
     .error { color: var(--down); }
     a { color: var(--accent); }
+    @media (max-width: 640px) { .controls { margin-left: 0; width: 100%; } input[type="search"] { flex: 1; } }
   </style>
 </head>
 <body>
@@ -46,97 +72,301 @@
   </header>
   <div class="wrap">
     <div class="tabs" id="tabs"></div>
+
+    <div class="filters">
+      <div class="chips" id="chips"></div>
+      <div class="controls">
+        <input type="search" id="q" placeholder="Search keyword" aria-label="Search keyword" />
+        <select id="win" aria-label="Comparison window">
+          <option value="4-12">Last 4 wks vs prior 12</option>
+          <option value="12-12">Last 12 wks vs prior 12</option>
+          <option value="26-26">Last 26 wks vs prior 26</option>
+          <option value="52-52">Last 52 wks vs prior 52</option>
+        </select>
+        <select id="thr" aria-label="Threshold">
+          <option value="10">±10% threshold</option>
+          <option value="20">±20% threshold</option>
+          <option value="50">±50% threshold</option>
+        </select>
+        <select id="sort" aria-label="Sort">
+          <option value="change_desc">Biggest risers</option>
+          <option value="change_asc">Biggest fallers</option>
+          <option value="recent_desc">Highest recent interest</option>
+          <option value="az">A–Z</option>
+        </select>
+      </div>
+    </div>
+    <div class="hint" id="hint"></div>
+
     <div id="content"></div>
   </div>
   <script>
     const DATA_URL = "data/trends.json";
-    let DATA = null, activeSegment = "All";
-    const charts = [];
+    const WEEK = 7 * 864e5;
+    const MIN_ACTIVE_WEEKS = 3;   // fewer non-zero weeks than this in the window = "Low data"
+    const CHART_WEEKS = 52;       // how much history each sparkline shows
+
+    const STATUS = {
+      all:      { label: "All" },
+      rising:   { label: "Rising" },
+      breakout: { label: "Breakout" },
+      falling:  { label: "Falling" },
+      stable:   { label: "Stable" },
+      low:      { label: "Low data" },
+    };
+    const COLORS = { rising: "#35c78a", breakout: "#f5b945", falling: "#ff6b6b", stable: "#8a93a6", low: "#8a93a6" };
+
+    let DATA = null, GRID = [], ITEMS = [];
+    const state = { segment: "All", status: "all", q: "", win: "4-12", thr: 20, sort: "change_desc" };
+    const charts = new Map();
+    let observer = null;
+
     function fmtDate(iso) { try { return new Date(iso).toLocaleString(); } catch { return iso; } }
-    function trend(points) {
-      if (!points || points.length < 2) return { delta: null, dir: "flat" };
-      const first = points[0].value, last = points[points.length - 1].value;
-      if (first == null || last == null) return { delta: null, dir: "flat" };
-      const delta = last - first;
-      return { delta, dir: delta > 0 ? "up" : delta < 0 ? "down" : "flat" };
+    const iso = t => new Date(t).toISOString().slice(0, 10);
+    const avg = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    // Weekly date grid across all keywords. Weeks missing from a keyword = 0 interest.
+    function buildGrid() {
+      const dates = new Set();
+      for (const s of DATA.segments) for (const k of s.keywords || []) for (const p of k.points || []) dates.add(p.date);
+      if (!dates.size) return [];
+      const sorted = [...dates].sort();
+      const start = Date.parse(sorted[0]), end = Date.parse(sorted[sorted.length - 1]);
+      const grid = [];
+      for (let t = start; t <= end; t += WEEK) grid.push(iso(t));
+      return grid;
     }
-    function destroyCharts() { while (charts.length) { const c = charts.pop(); try { c.destroy(); } catch {} } }
+
+    function buildItems() {
+      const items = [];
+      for (const seg of DATA.segments) {
+        for (const k of seg.keywords || []) {
+          const m = new Map((k.points || []).map(p => [p.date, p.value ?? 0]));
+          items.push({ keyword: k.keyword, segment: seg.name, series: GRID.map(d => m.get(d) ?? 0) });
+        }
+      }
+      return items;
+    }
+
+    function score(series) {
+      const [rN, bN] = state.win.split("-").map(Number);
+      const recentArr = series.slice(-rN);
+      const baseArr = series.slice(-(rN + bN), -rN);
+      const recent = avg(recentArr), base = avg(baseArr);
+      const active = recentArr.concat(baseArr).filter(v => v > 0).length;
+      let status, change = null;
+      if (active < MIN_ACTIVE_WEEKS) status = "low";
+      else if (base === 0) { status = recent > 0 ? "breakout" : "low"; change = recent > 0 ? Infinity : null; }
+      else {
+        change = (recent - base) / base * 100;
+        status = change >= state.thr ? "rising" : change <= -state.thr ? "falling" : "stable";
+      }
+      return { recent, base, change, status, latest: series[series.length - 1] ?? 0 };
+    }
+
+    function sortFn(a, b) {
+      const ca = a.s.change ?? -Infinity, cb = b.s.change ?? -Infinity;
+      switch (state.sort) {
+        case "change_asc": return (a.s.change ?? Infinity) - (b.s.change ?? Infinity);
+        case "recent_desc": return b.s.recent - a.s.recent;
+        case "az": return a.keyword.localeCompare(b.keyword);
+        default: return cb - ca;
+      }
+    }
+
+    function fmtChange(s) {
+      if (s.status === "breakout") return "New";
+      if (s.change == null) return "—";
+      return (s.change > 0 ? "▲ " : s.change < 0 ? "▼ " : "▬ ") + Math.abs(Math.round(s.change)) + "%";
+    }
+
     function keywordCard(item) {
-      const { keyword, segment, latest, points } = item;
-      const t = trend(points);
-      const deltaStr = t.delta == null ? "" :
-        `<span class="delta ${t.dir}">${t.delta > 0 ? "▲" : t.delta < 0 ? "▼" : "▬"} ${Math.abs(t.delta)}</span>`;
-      const id = "c_" + Math.random().toString(36).slice(2);
+      const { keyword, segment, s } = item;
+      const [rN, bN] = state.win.split("-");
       const card = document.createElement("div");
       card.className = "card";
+      card.dataset.key = keyword;
       card.innerHTML = `
         <div class="top">
-          <div><div class="kw">${keyword}</div><div class="seg">${segment || ""}</div></div>
-          <div class="val">${latest ?? "—"}${deltaStr}</div>
+          <div>
+            <div class="kw">${esc(keyword)}</div>
+            <div class="seg">${esc(segment || "")}</div>
+          </div>
+          <div class="val">${s.latest}
+            <div><span class="badge ${s.status}">${fmtChange(s)}</span></div>
+          </div>
         </div>
-        <div class="chart-box"><canvas id="${id}"></canvas></div>`;
-      setTimeout(() => renderChart(id, points, t.dir), 0);
+        <div class="sub">Avg ${s.recent.toFixed(1)} last ${rN} wks vs ${s.base.toFixed(1)} prior ${bN} · ${STATUS[s.status].label}</div>
+        <div class="chart-box"><canvas></canvas></div>`;
+      card._item = item;
       return card;
     }
-    function renderChart(id, points, dir) {
-      const el = document.getElementById(id);
-      if (!el || !points || !points.length) return;
-      const color = dir === "down" ? "#ff6b6b" : "#35c78a";
-      const ctx = el.getContext("2d");
-      const grad = ctx.createLinearGradient(0, 0, 0, 120);
+
+    function renderChart(card) {
+      if (charts.has(card)) return;
+      const { series, s } = card._item;
+      const canvas = card.querySelector("canvas");
+      const pts = series.slice(-CHART_WEEKS), labels = GRID.slice(-CHART_WEEKS);
+      const [rN] = state.win.split("-").map(Number);
+      const color = COLORS[s.status];
+      const ctx = canvas.getContext("2d");
+      const grad = ctx.createLinearGradient(0, 0, 0, 110);
       grad.addColorStop(0, color + "55"); grad.addColorStop(1, color + "00");
-      charts.push(new Chart(ctx, {
+      charts.set(card, new Chart(ctx, {
         type: "line",
-        data: { labels: points.map(p => p.date), datasets: [{
-          data: points.map(p => p.value), borderColor: color, backgroundColor: grad,
-          borderWidth: 2, fill: true, pointRadius: 0, tension: 0.25 }] },
-        options: { responsive: true, maintainAspectRatio: false,
+        data: { labels, datasets: [{
+          data: pts, borderColor: color, backgroundColor: grad,
+          borderWidth: 2, fill: true, pointRadius: 0, tension: 0.25,
+          // dim everything before the "recent" window so the comparison is visible
+          segment: { borderColor: c => c.p1DataIndex >= pts.length - rN ? color : color + "66" },
+        }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: false,
           plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
-          scales: { x: { display: false }, y: { display: false, beginAtZero: true } } },
+          scales: { x: { display: false }, y: { display: false, beginAtZero: true, suggestedMax: 100 } } },
       }));
     }
+
+    function destroyCharts() {
+      for (const c of charts.values()) { try { c.destroy(); } catch {} }
+      charts.clear();
+      if (observer) observer.disconnect();
+    }
+
+    // Only draw charts when a card scrolls into view (242+ canvases at once is slow)
+    function observe(card) {
+      if (!("IntersectionObserver" in window)) return renderChart(card);
+      if (!observer) observer = new IntersectionObserver(entries => {
+        for (const e of entries) if (e.isIntersecting) { renderChart(e.target); observer.unobserve(e.target); }
+      }, { rootMargin: "200px" });
+      observer.observe(card);
+    }
+
+    function renderChips(scored) {
+      const counts = { all: scored.length };
+      for (const i of scored) counts[i.s.status] = (counts[i.s.status] || 0) + 1;
+      const chips = document.getElementById("chips");
+      chips.innerHTML = "";
+      for (const [key, { label }] of Object.entries(STATUS)) {
+        const b = document.createElement("button");
+        b.className = "chip" + (state.status === key ? " active" : "");
+        b.dataset.s = key;
+        b.innerHTML = `${label}<span class="n">${counts[key] || 0}</span>`;
+        b.onclick = () => { state.status = key; update(); };
+        chips.appendChild(b);
+      }
+    }
+
     function render() {
       destroyCharts();
       const content = document.getElementById("content");
       content.innerHTML = "";
-      if (!DATA || !DATA.segments || !DATA.segments.length) {
+      if (!DATA || !DATA.segments || !DATA.segments.length || !GRID.length) {
         content.innerHTML = '<div class="empty">No trend data yet. The daily workflow will populate this.</div>';
+        document.getElementById("chips").innerHTML = "";
         return;
       }
-      const segments = activeSegment === "All" ? DATA.segments
-        : DATA.segments.filter(s => s.name === activeSegment);
-      for (const seg of segments) {
+      const q = state.q.trim().toLowerCase();
+      // score everything in the active segment + search, so chip counts match what you can filter to
+      const pool = ITEMS
+        .filter(i => state.segment === "All" || i.segment === state.segment)
+        .filter(i => !q || i.keyword.toLowerCase().includes(q))
+        .map(i => ({ ...i, s: score(i.series) }));
+      renderChips(pool);
+
+      const shown = pool.filter(i => state.status === "all" || i.s.status === state.status).sort(sortFn);
+      if (!shown.length) { content.innerHTML = '<div class="empty">Nothing matches these filters.</div>'; return; }
+
+      const bySeg = new Map();
+      for (const i of shown) { if (!bySeg.has(i.segment)) bySeg.set(i.segment, []); bySeg.get(i.segment).push(i); }
+      for (const [name, list] of bySeg) {
         const title = document.createElement("div");
-        title.className = "section-title"; title.textContent = seg.name;
+        title.className = "section-title";
+        title.innerHTML = `${esc(name)}<span class="n">${list.length}</span>`;
         content.appendChild(title);
         const grid = document.createElement("div"); grid.className = "grid";
-        for (const kw of (seg.keywords || [])) grid.appendChild(keywordCard({ ...kw, segment: seg.name }));
+        for (const i of list) { const c = keywordCard(i); grid.appendChild(c); observe(c); }
         content.appendChild(grid);
       }
     }
+
     function renderTabs() {
       const tabs = document.getElementById("tabs");
       tabs.innerHTML = "";
       const names = ["All", ...DATA.segments.map(s => s.name)];
+      if (names.length <= 2) return; // only one segment, tabs add nothing
       for (const name of names) {
         const b = document.createElement("button");
-        b.className = "tab" + (name === activeSegment ? " active" : "");
+        b.className = "tab" + (name === state.segment ? " active" : "");
         b.textContent = name;
-        b.onclick = () => { activeSegment = name; renderTabs(); render(); };
+        b.onclick = () => { state.segment = name; update(); };
         tabs.appendChild(b);
       }
     }
+
+    function renderHint() {
+      const [rN, bN] = state.win.split("-");
+      const last = GRID[GRID.length - 1];
+      document.getElementById("hint").textContent =
+        `Compares avg interest in the last ${rN} weeks to the ${bN} weeks before. ` +
+        `Rising/Falling = change beyond ±${state.thr}%. Breakout = zero before, active now. ` +
+        `Low data = under ${MIN_ACTIVE_WEEKS} active weeks in the window. Latest week: ${last || "—"}.`;
+    }
+
+    // Keep filters in the URL so a filtered view can be shared
+    function writeHash() {
+      const p = new URLSearchParams();
+      if (state.segment !== "All") p.set("seg", state.segment);
+      if (state.status !== "all") p.set("status", state.status);
+      if (state.q) p.set("q", state.q);
+      if (state.win !== "4-12") p.set("win", state.win);
+      if (state.thr !== 20) p.set("thr", state.thr);
+      if (state.sort !== "change_desc") p.set("sort", state.sort);
+      history.replaceState(null, "", p.toString() ? "#" + p : location.pathname + location.search);
+    }
+    function readHash() {
+      const p = new URLSearchParams(location.hash.slice(1));
+      state.segment = p.get("seg") || "All";
+      state.status = STATUS[p.get("status")] ? p.get("status") : "all";
+      state.q = p.get("q") || "";
+      state.win = ["4-12", "12-12", "26-26", "52-52"].includes(p.get("win")) ? p.get("win") : "4-12";
+      state.thr = [10, 20, 50].includes(+p.get("thr")) ? +p.get("thr") : 20;
+      state.sort = ["change_desc", "change_asc", "recent_desc", "az"].includes(p.get("sort")) ? p.get("sort") : "change_desc";
+      document.getElementById("q").value = state.q;
+      document.getElementById("win").value = state.win;
+      document.getElementById("thr").value = state.thr;
+      document.getElementById("sort").value = state.sort;
+    }
+
+    function update() { writeHash(); renderTabs(); renderHint(); render(); }
+
+    function bindControls() {
+      let t;
+      document.getElementById("q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value; update(); }, 150); });
+      document.getElementById("win").addEventListener("change", e => { state.win = e.target.value; update(); });
+      document.getElementById("thr").addEventListener("change", e => { state.thr = +e.target.value; update(); });
+      document.getElementById("sort").addEventListener("change", e => {
+        state.sort = e.target.value;
+        // picking "fallers" with the Rising chip active shows nothing useful, so follow the intent
+        if (state.sort === "change_asc" && state.status === "rising") state.status = "falling";
+        if (state.sort === "change_desc" && state.status === "falling") state.status = "rising";
+        update();
+      });
+    }
+
     async function load() {
       try {
         const res = await fetch(DATA_URL + "?t=" + Date.now());
         if (!res.ok) throw new Error("HTTP " + res.status);
         DATA = await res.json();
         document.getElementById("meta").textContent = "Updated " + fmtDate(DATA.generatedAt);
-        renderTabs(); render();
+        GRID = buildGrid();
+        ITEMS = buildItems();
+        readHash(); bindControls(); update();
       } catch (e) {
         document.getElementById("meta").textContent = "";
         document.getElementById("content").innerHTML =
-          '<div class="error">Could not load ' + DATA_URL + ' — ' + e.message +
+          '<div class="error">Could not load ' + DATA_URL + ' — ' + esc(e.message) +
           '.<br/>Make sure the file exists in the repo (the n8n workflow commits it daily).</div>';
       }
     }
