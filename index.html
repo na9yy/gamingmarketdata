@@ -77,17 +77,6 @@
       <div class="chips" id="chips"></div>
       <div class="controls">
         <input type="search" id="q" placeholder="Search keyword" aria-label="Search keyword" />
-        <select id="win" aria-label="Comparison window">
-          <option value="4-12">Last 4 wks vs prior 12</option>
-          <option value="12-12">Last 12 wks vs prior 12</option>
-          <option value="26-26">Last 26 wks vs prior 26</option>
-          <option value="52-52">Last 52 wks vs prior 52</option>
-        </select>
-        <select id="thr" aria-label="Threshold">
-          <option value="10">±10% threshold</option>
-          <option value="20">±20% threshold</option>
-          <option value="50">±50% threshold</option>
-        </select>
         <select id="sort" aria-label="Sort">
           <option value="change_desc">Biggest risers</option>
           <option value="change_asc">Biggest fallers</option>
@@ -104,7 +93,9 @@
     const DATA_URL = "data/trends.json";
     const WEEK = 7 * 864e5;
     const MIN_ACTIVE_WEEKS = 3;   // fewer non-zero weeks than this in the window = "Low data"
-    const CHART_WEEKS = 104;       // how much history each sparkline shows
+    const CHART_WEEKS = 104;
+    const WINDOW = "4-12";        // last 4 weeks vs prior 12. Change here if needed (e.g. "12-12", "26-26", "52-52")
+    const THRESHOLD = 20;         // % change needed to count as Rising / Falling      // how much history each sparkline shows (104 = 2 years)
 
     const STATUS = {
       all:      { label: "All" },
@@ -117,7 +108,7 @@
     const COLORS = { rising: "#35c78a", breakout: "#f5b945", falling: "#ff6b6b", stable: "#8a93a6", low: "#8a93a6" };
 
     let DATA = null, GRID = [], ITEMS = [];
-    const state = { segment: "All", status: "all", q: "", win: "4-12", thr: 20, sort: "change_desc" };
+    const state = { segment: "All", status: "all", q: "", win: WINDOW, thr: THRESHOLD, sort: "change_desc" };
     const charts = new Map();
     let observer = null;
 
@@ -319,8 +310,6 @@
       if (state.segment !== "All") p.set("seg", state.segment);
       if (state.status !== "all") p.set("status", state.status);
       if (state.q) p.set("q", state.q);
-      if (state.win !== "4-12") p.set("win", state.win);
-      if (state.thr !== 20) p.set("thr", state.thr);
       if (state.sort !== "change_desc") p.set("sort", state.sort);
       history.replaceState(null, "", p.toString() ? "#" + p : location.pathname + location.search);
     }
@@ -329,12 +318,8 @@
       state.segment = p.get("seg") || "All";
       state.status = STATUS[p.get("status")] ? p.get("status") : "all";
       state.q = p.get("q") || "";
-      state.win = ["4-12", "12-12", "26-26", "52-52"].includes(p.get("win")) ? p.get("win") : "4-12";
-      state.thr = [10, 20, 50].includes(+p.get("thr")) ? +p.get("thr") : 20;
       state.sort = ["change_desc", "change_asc", "recent_desc", "az"].includes(p.get("sort")) ? p.get("sort") : "change_desc";
       document.getElementById("q").value = state.q;
-      document.getElementById("win").value = state.win;
-      document.getElementById("thr").value = state.thr;
       document.getElementById("sort").value = state.sort;
     }
 
@@ -343,8 +328,6 @@
     function bindControls() {
       let t;
       document.getElementById("q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value; update(); }, 150); });
-      document.getElementById("win").addEventListener("change", e => { state.win = e.target.value; update(); });
-      document.getElementById("thr").addEventListener("change", e => { state.thr = +e.target.value; update(); });
       document.getElementById("sort").addEventListener("change", e => {
         state.sort = e.target.value;
         // picking "fallers" with the Rising chip active shows nothing useful, so follow the intent
