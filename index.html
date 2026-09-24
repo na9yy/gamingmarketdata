@@ -122,6 +122,7 @@
     .corr { margin-left: auto; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .corr.pos { color: var(--up); } .corr.neg { color: var(--down); }
     td .corr { margin: 0; }
+    .legend.stats2 { gap: 6px; } .legend.stats2 .corr { margin-left: 0; } .legend .dot { color: var(--faint); }
     .sub { font-size: 11px; color: var(--faint); margin-top: 6px; font-variant-numeric: tabular-nums; }
     .sub b { color: var(--muted); font-weight: 700; }
     .chart-box { position: relative; height: 64px; margin: 2px -4px 0; min-width: 0; }
@@ -180,6 +181,54 @@
       #d-periods { order: 3; flex: 1 1 100%; width: 100%; }
       .d-chart { height: 50vh; }
     }
+
+    /* compare picks */
+    .card { position: relative; }
+    .pick { position: absolute; top: 6px; left: 6px; z-index: 2; width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--border);
+      background: var(--panel-2); color: var(--muted); font-size: 12px; font-weight: 800; line-height: 1; cursor: pointer; display: grid; place-items: center;
+      opacity: 0; transition: opacity .12s; padding: 0; }
+    .card:hover .pick, .pick.on, .pick:focus-visible { opacity: 1; }
+    .pick.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+    td .pick { position: static; opacity: .6; flex: none; }
+    tr:hover td .pick, td .pick.on { opacity: 1; }
+    @media (hover: none) { .pick { opacity: .8; } }
+    .tray { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 10px;
+      background: var(--panel-2); border: 1px solid var(--panel-3); border-radius: 12px; padding: 8px 10px; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+      max-width: calc(100% - 24px); }
+    .tray[hidden] { display: none; }
+    .tray-lbl { color: var(--faint); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+    .tray-list { display: flex; gap: 6px; overflow-x: auto; }
+    .tchip { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 7px;
+      padding: 3px 4px 3px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .tchip i, .d-stat.cmp i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    .tchip button { background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 11px; padding: 0 3px; }
+    .tchip button:hover { color: var(--text); }
+    .tray-go { background: var(--blue); color: #fff; border: 0; border-radius: 8px; padding: 6px 12px; font-weight: 800; font-size: 12px; cursor: pointer; }
+    .tray-go:disabled { opacity: .45; cursor: not-allowed; }
+    .tray-clear { background: none; border: 0; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+    .flash { position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%); z-index: 60; background: var(--panel-3); color: var(--text);
+      padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; }
+    .flash[hidden] { display: none; }
+
+    /* lead / lag */
+    .lagtag { font-weight: 800; white-space: nowrap; color: var(--faint); }
+    .lagtag.lead { color: var(--up); } .lagtag.lagg { color: var(--blue-light); } .lagtag.same { color: var(--muted); }
+    .lagbig { font-size: 14px !important; } .lagbig.lead { color: var(--up); }
+    .d-lag { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .d-lag[hidden] { display: none; }
+    .d-lag-head { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; font-size: 13px; }
+    .d-lag-head span { color: var(--faint); font-size: 12px; }
+    .d-lag-body { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: center; margin-top: 6px; }
+    .d-lag-chart { position: relative; height: 120px; }
+    .d-lag-body p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .d-lag-body p b { color: var(--text); }
+    .d-opts { display: flex; gap: 6px; }
+    .revtoggle .sw.dotted { background: none; border-top: 2px dashed var(--faint); height: 0; }
+    .revtoggle.active .sw.dotted { border-top-color: #9AA6B8; background: none; }
+    .lg.ly::before { background: none; border-top: 2px dashed #9AA6B8; height: 0; }
+    .d-stat.cmp > span:first-child { text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--muted); max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .d-stat.cmp b { font-size: 16px; }
+    @media (max-width: 760px) { .d-lag-body { grid-template-columns: 1fr; } .tray-lbl { display: none; } }
 
     .empty, .error { background: var(--panel); border: 1px dashed var(--border); border-radius: 10px; padding: 30px; text-align: center; color: var(--muted); margin-top: 12px; }
     .error { color: var(--down); }
@@ -292,7 +341,7 @@
     };
 
     let DATA = null, GRID = [], ITEMS = [], REV = null;
-    const state = { segment: "All", status: "all", q: "", view: "cards", showRev: true, period: DEFAULT_PERIOD, win: "4-12", thr: THRESHOLD, sort: "change_desc" };
+    const state = { segment: "All", status: "all", q: "", view: "cards", showRev: true, picks: [], period: DEFAULT_PERIOD, win: "4-12", thr: THRESHOLD, sort: "change_desc" };
     const charts = new Map();
     let observer = null;
 
@@ -392,7 +441,11 @@
         <div class="sub">${compareText(s)}</div>
         <div class="chart-box"><canvas></canvas></div>`;
       card._item = item;
-      card.addEventListener("click", e => { if (!e.target.closest("a")) openDetail(card._item); });
+      card.insertAdjacentHTML("afterbegin", pickBtn(item));
+      card.addEventListener("click", e => {
+        if (e.target.closest(".pick")) { e.stopPropagation(); togglePick(item); return; }
+        if (!e.target.closest("a")) openDetail(card._item);
+      });
       return card;
     }
 
@@ -452,13 +505,13 @@
     function keywordTable(list) {
       const wrap = document.createElement("div"); wrap.className = "tbl-wrap";
       const hasRev = list.some(i => i.rev);
-      const cols = hasRev ? [...COLS.slice(0, 6), { key: null, label: "Search↔Rev r" }, COLS[6]] : COLS;
+      const cols = hasRev ? [...COLS.slice(0, 6), { key: null, label: "Search↔Rev r" }, { key: null, label: "Lead / lag" }, COLS[6]] : COLS;
       const head = cols.map(c => {
         const on = c.key && (state.sort === c.key || state.sort === c.alt);
         const arrow = on ? (state.sort === "change_asc" ? " ▲" : state.sort === "az" ? " ▲" : " ▼") : "";
         return `<th data-k="${c.key || ""}" data-alt="${c.alt || ""}" class="${on ? "on" : ""}${c.left ? " left" : ""}">${c.label}${arrow}</th>`;
       }).join("");
-      wrap.innerHTML = `<table><colgroup>${hasRev ? '<col style="width:27%"><col style="width:10%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:11%"><col style="width:18%">' : '<col style="width:32%"><col style="width:11%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:18%">'}</colgroup><thead><tr>${head}</tr></thead><tbody></tbody></table>`;
+      wrap.innerHTML = `<table><colgroup>${hasRev ? '<col style="width:24%"><col style="width:9%"><col style="width:6%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:11%"><col style="width:11%"><col style="width:15%">' : '<col style="width:32%"><col style="width:11%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:18%">'}</colgroup><thead><tr>${head}</tr></thead><tbody></tbody></table>`;
       wrap.querySelectorAll("th").forEach(th => {
         const k = th.dataset.k; if (!k) { th.style.cursor = "default"; return; }
         th.onclick = () => { state.sort = state.sort === k && th.dataset.alt ? th.dataset.alt : k; document.getElementById("sort").value = state.sort; update(); };
@@ -472,10 +525,14 @@
         tr.innerHTML = `<td><div class="cell"><div class="thumb">${thumb}</div>${title}</div></td>
           <td class="segc">${esc(segment)}</td><td class="num2">${s.latest}</td>
           <td>${s.recent.toFixed(1)}</td><td>${s.base.toFixed(1)}</td>
-          <td><span class="badge ${s.status}">${fmtChange(s)}</span></td>${hasRev ? `<td>${item.rev ? corrLabel(corrFor(item)) : "—"}</td>` : ""}
+          <td><span class="badge ${s.status}">${fmtChange(s)}</span></td>${hasRev ? `<td>${item.rev ? corrLabel(corrFor(item)) : "—"}</td><td>${item.rev ? lagLabel(leadLag(item)) : "—"}</td>` : ""}
           <td class="spark"><div><canvas></canvas></div></td>`;
         tr._item = item;
-        tr.addEventListener("click", e => { if (!e.target.closest("a")) openDetail(item); });
+        tr.querySelector(".cell").insertAdjacentHTML("afterbegin", pickBtn(item));
+        tr.addEventListener("click", e => {
+          if (e.target.closest(".pick")) { e.stopPropagation(); togglePick(item); return; }
+          if (!e.target.closest("a")) openDetail(item);
+        });
         tb.appendChild(tr); observe(tr);
       }
       return wrap;
@@ -577,6 +634,50 @@
       for (let i = 0; i < xs.length; i++) { const dx = xs[i] - mx, dy = ys[i] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
       return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
     }
+    // Lead/lag: correlate search at week t with revenue at week t+k, over the full 2 years.
+    // k > 0 = search moves first (a forecast signal). Partial last week left out.
+    // Both series are detrended first (minus a centered 13-week average), so we compare short-term
+    // moves, not the long-term drift both lines share. Raw levels give fake "leads".
+    const detrend = (s, W = 6) => s.map((v, i) => {
+      let sum = 0, n = 0;
+      for (let j = Math.max(0, i - W); j <= Math.min(s.length - 1, i + W); j++) { sum += s[j] ?? 0; n++; }
+      return (v ?? 0) - sum / n;
+    });
+    const LAGS = [-4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8];
+    function leadLag(item) {
+      if (!item.rev) return null;
+      if (item._lag !== undefined) return item._lag;
+      const n = item.series.length - 1, out = [];
+      const S = detrend(item.series.slice(0, n)), V = detrend(item.rev.slice(0, n));
+      for (const k of LAGS) {
+        const a = [], b = [];
+        for (let t = 0; t < n; t++) {
+          const u = t + k;
+          if (u < 0 || u >= n || item.rev[u] == null) continue;
+          a.push(S[t]); b.push(V[u]);
+        }
+        out.push({ k, r: a.length >= 20 ? correlation(a.concat([0]), b.concat([0])) : null });
+      }
+      const valid = out.filter(o => o.r != null);
+      if (!valid.length) return (item._lag = null);
+      const best = valid.reduce((p, c) => (c.r > p.r ? c : p));
+      const zero = out.find(o => o.k === 0);
+      // only call it a lead/lag when it clearly beats "same week"
+      const k = best.r >= 0.3 && (!zero || zero.r == null || best.r - zero.r >= 0.03) ? best.k : (best.r >= 0.3 ? 0 : null);
+      return (item._lag = { k, r: k == null ? best.r : out.find(o => o.k === k).r, list: out });
+    }
+    function lagText(L) {
+      if (!L || L.k == null) return "No clear lead";
+      if (L.k === 0) return "Search & sales move the same week";
+      return L.k > 0 ? `Search leads sales by ${L.k}w` : `Sales lead search by ${-L.k}w`;
+    }
+    function lagLabel(L) {
+      if (!L) return "";
+      const cls = L.k > 0 ? "lead" : L.k < 0 ? "lagg" : L.k === 0 ? "same" : "none";
+      const short = L.k == null ? "no clear lead" : L.k === 0 ? "same week" : L.k > 0 ? `search leads ${L.k}w` : `sales lead ${-L.k}w`;
+      return `<span class="lagtag ${cls}" title="${esc(lagText(L))}${L.k != null ? ` (r ${L.r.toFixed(2)} on short-term moves, full 2 years)` : ""}">${L.k > 0 ? "⏩ " : ""}${short}</span>`;
+    }
+
     function corrFor(item) {
       if (!item.rev) return null;
       const w = PERIODS[state.period].weeks;
@@ -616,7 +717,7 @@
         for (const i of picks) {
           const c = keywordCard(i); c.classList.add("top-card");
           if (i.rev) c.querySelector(".sub").insertAdjacentHTML("afterend",
-            `<div class="legend"><span class="lg s">Search</span><span class="lg r">Revenue (indexed)</span>${corrLabel(corrFor(i))}</div>`);
+            `<div class="legend"><span class="lg s">Search</span><span class="lg r">Revenue (indexed)</span></div><div class="legend stats2">${corrLabel(corrFor(i))}<span class="dot">·</span>${lagLabel(leadLag(i))}</div>`);
           grid.appendChild(c); observe(c);
         }
         content.appendChild(grid);
@@ -624,14 +725,67 @@
     }
 
     // ---------- Big chart view ----------
-    let detail = null; // { item, period, chart }
+    // ---------- Compare picks ----------
+    const MAX_PICKS = 5;
+    const PICK_COLORS = ["#5AA8F7", "#F5B83D", "#3DDC84", "#F2555A", "#B388FF"];
+    const pickKey = i => i.segment + "|" + i.keyword;
+    const pickBtn = i => {
+      const on = state.picks.includes(pickKey(i));
+      return `<button class="pick${on ? " on" : ""}" aria-pressed="${on}" title="${on ? "Remove from compare" : "Add to compare"}">${on ? "✓" : "+"}</button>`;
+    };
+    function togglePick(item) {
+      const k = pickKey(item), at = state.picks.indexOf(k);
+      if (at >= 0) state.picks.splice(at, 1);
+      else if (state.picks.length < MAX_PICKS) state.picks.push(k);
+      else { flash(`Compare up to ${MAX_PICKS} keywords`); return; }
+      syncPicks();
+    }
+    function syncPicks() {
+      document.querySelectorAll(".card, tbody tr").forEach(el => {
+        if (!el._item) return;
+        const b = el.querySelector(".pick"); if (!b) return;
+        const on = state.picks.includes(pickKey(el._item));
+        b.classList.toggle("on", on); b.textContent = on ? "✓" : "+"; b.setAttribute("aria-pressed", on);
+        b.title = on ? "Remove from compare" : "Add to compare";
+      });
+      const tray = document.getElementById("tray");
+      tray.hidden = !state.picks.length;
+      document.getElementById("tray-list").innerHTML = state.picks.map((k, i) =>
+        `<span class="tchip"><i style="background:${PICK_COLORS[i]}"></i>${esc(k.split("|")[1])}<button data-k="${esc(k)}" aria-label="Remove">✕</button></span>`).join("");
+      document.querySelectorAll("#tray-list button").forEach(b => b.onclick = () => { state.picks.splice(state.picks.indexOf(b.dataset.k), 1); syncPicks(); });
+      document.getElementById("tray-go").disabled = state.picks.length < 2;
+      writeHash();
+    }
+    function flash(msg) {
+      const f = document.getElementById("flash"); f.textContent = msg; f.hidden = false;
+      clearTimeout(flash.t); flash.t = setTimeout(() => (f.hidden = true), 1800);
+    }
+    const itemByKey = k => ITEMS.find(i => pickKey(i) === k);
+
+    // ---------- Big chart view ----------
+    let detail = null; // { item | items, period, yoy, chart, lagChart }
     function openDetail(item) {
-      detail = { item, period: state.period, chart: null };
-      const { thumb, title } = identity(item);
-      document.getElementById("d-thumb").innerHTML = thumb;
-      document.getElementById("d-title").innerHTML = title.replace('class="kw"', "");
-      document.getElementById("d-seg").textContent = item.segment;
+      detail = { item, period: state.period, yoy: true, chart: null, lagChart: null };
+      showDetail();
+    }
+    function openCompare() {
+      const items = state.picks.map(itemByKey).filter(Boolean);
+      if (items.length < 2) return;
+      detail = { items, period: state.period, yoy: false, chart: null, lagChart: null };
+      showDetail();
+    }
+    function showDetail() {
       const m = document.getElementById("detail");
+      if (detail.items) {
+        document.getElementById("d-thumb").innerHTML = "⇄";
+        document.getElementById("d-title").textContent = `Compare ${detail.items.length} keywords`;
+        document.getElementById("d-seg").textContent = "Google search interest, each keyword on its own 0-100 scale";
+      } else {
+        const { thumb, title } = identity(detail.item);
+        document.getElementById("d-thumb").innerHTML = thumb;
+        document.getElementById("d-title").innerHTML = title.replace('class="kw"', "");
+        document.getElementById("d-seg").textContent = detail.item.segment;
+      }
       m.hidden = false;
       document.body.style.overflow = "hidden";
       drawDetail();
@@ -640,14 +794,24 @@
     function closeDetail() {
       if (!detail) return;
       if (detail.chart) detail.chart.destroy();
+      if (detail.lagChart) detail.lagChart.destroy();
       detail = null;
       document.getElementById("detail").hidden = true;
       document.body.style.overflow = "";
     }
+    // score an arbitrary series with a given period's rules, without touching page state
+    function scoreFor(series, periodKey) {
+      const saved = [state.period, state.win];
+      setPeriod(periodKey);
+      const s = score(series);
+      [state.period, state.win] = saved;
+      return s;
+    }
+    const fmtWeekFor = w => d => new Date(d + "T00:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short", year: w > 30 ? "2-digit" : undefined, timeZone: "UTC" });
+
     function drawDetail() {
-      const { item } = detail;
-      const p = PERIODS[detail.period], w = p.weeks;
-      // periods inside the big view
+      const p = PERIODS[detail.period], w = p.weeks, labels = GRID.slice(-w), fmtWeek = fmtWeekFor(w);
+      // period buttons + options
       const box = document.getElementById("d-periods"); box.innerHTML = "";
       for (const [key, pp] of Object.entries(PERIODS)) {
         const b = document.createElement("button");
@@ -656,40 +820,89 @@
         b.onclick = () => { detail.period = key; drawDetail(); };
         box.appendChild(b);
       }
-      // stats for this period (same rules as the cards)
-      const saved = [state.period, state.win];
-      setPeriod(detail.period);
-      const s = score(item.series), r = item.rev ? correlation(item.series.slice(-w), item.rev.slice(-w)) : null, cmp = compareText(s);
-      [state.period, state.win] = saved;
-      const [rN, bN] = (PERIODS[detail.period].win || `${w}-${w}`).split("-");
-      document.getElementById("d-stats").innerHTML = `
-        <div class="d-stat"><span>Latest week</span><b>${s.latest}</b></div>
-        <div class="d-stat"><span>Avg last ${detail.period === DEFAULT_PERIOD ? rN + "w" : p.short}</span><b>${s.recent.toFixed(1)}</b></div>
-        <div class="d-stat"><span>Avg prior ${detail.period === DEFAULT_PERIOD ? bN + "w" : p.short}</span><b>${s.base.toFixed(1)}</b></div>
-        <div class="d-stat"><span>Change</span><span class="badge ${s.status}">${fmtChange(s)}</span></div>
-        ${r != null ? `<div class="d-stat"><span>Search ↔ revenue</span>${corrLabel(r)}</div>` : ""}`;
-      document.getElementById("d-foot").innerHTML =
-        `<span class="lg s">Google search interest (0-100)</span>${item.rev ? '<span class="lg r">GameBoost revenue (indexed 0-100)</span>' : ""}<span>${esc(STATUS[s.status].label)} · weekly data · latest week may be incomplete</span>`;
+      const opts = document.getElementById("d-opts");
+      opts.innerHTML = detail.items ? "" :
+        `<button class="revtoggle${detail.yoy ? " active" : ""}" id="d-yoy" aria-pressed="${detail.yoy}" title="Same weeks one year earlier"><span class="sw dotted"></span>Last year</button>`;
+      if (!detail.items) document.getElementById("d-yoy").onclick = () => { detail.yoy = !detail.yoy; drawDetail(); };
 
-      const labels = GRID.slice(-w), color = COLORS[s.status];
+      let datasets = [];
+      const base = { borderWidth: 2.2, tension: 0.25, pointHoverRadius: 5, spanGaps: true };
+      if (detail.items) {
+        // ---- compare ----
+        detail.items.forEach((it, i) => {
+          const c = PICK_COLORS[i];
+          datasets.push({ ...base, label: it.keyword, data: it.series.slice(-w), borderColor: c, backgroundColor: c, fill: false, pointRadius: w <= 26 ? 2.5 : 0 });
+        });
+        document.getElementById("d-stats").innerHTML = detail.items.map((it, i) => {
+          const s = scoreFor(it.series, detail.period);
+          return `<div class="d-stat cmp"><span><i style="background:${PICK_COLORS[i]}"></i>${esc(it.keyword)}</span><b>${s.recent.toFixed(1)}</b> <span class="badge ${s.status}">${fmtChange(s)}</span></div>`;
+        }).join("");
+        document.getElementById("d-foot").innerHTML = `<span>Big number = avg in the latest ${detail.period === DEFAULT_PERIOD ? "4 weeks" : p.text}. Google scales every keyword to its own peak, so compare shapes and timing, not absolute size.</span>`;
+        document.getElementById("d-lag").hidden = true;
+      } else {
+        // ---- single ----
+        const item = detail.item, s = scoreFor(item.series, detail.period), color = COLORS[s.status];
+        const r = item.rev ? correlation(item.series.slice(-w), item.rev.slice(-w)) : null;
+        const L = leadLag(item);
+        const [rN, bN] = (p.win || `${w}-${w}`).split("-");
+        // last year: same weeks 52 weeks earlier
+        const offset = GRID.length - w;
+        const ly = labels.map((_, i) => { const j = offset + i - 52; return j >= 0 ? item.series[j] : null; });
+        const lyVals = ly.filter(v => v != null);
+        const recentN = detail.period === DEFAULT_PERIOD ? Number(rN) : w;
+        const lyRecent = ly.slice(-recentN).filter(v => v != null);
+        const yoy = lyRecent.length === recentN && avg(lyRecent) > 0 ? (avg(item.series.slice(-recentN)) - avg(lyRecent)) / avg(lyRecent) * 100 : null;
+        const ctx0 = document.getElementById("d-canvas").getContext("2d");
+        const grad = ctx0.createLinearGradient(0, 0, 0, 480);
+        grad.addColorStop(0, color + "44"); grad.addColorStop(1, color + "00");
+        datasets.push({ ...base, label: "Search", data: item.series.slice(-w), borderColor: color, backgroundColor: grad, fill: true, borderWidth: 2.4, pointRadius: w <= 26 ? 3 : 0, pointBackgroundColor: color });
+        if (detail.yoy && lyVals.length) datasets.push({ ...base, label: "Search last year", data: ly, borderColor: "#9AA6B8", borderDash: [5, 4], borderWidth: 1.6, fill: false, pointRadius: 0 });
+        if (item.rev) datasets.push({ ...base, label: "Revenue (indexed)", data: item.rev.slice(-w), borderColor: "#5AA8F7", borderWidth: 2, fill: false, pointRadius: w <= 26 ? 2.5 : 0, pointBackgroundColor: "#5AA8F7" });
+        const lastLbl = detail.period === DEFAULT_PERIOD ? rN + "w" : p.short;
+        document.getElementById("d-stats").innerHTML = `
+          <div class="d-stat"><span>Latest week</span><b>${s.latest}</b></div>
+          <div class="d-stat"><span>Avg last ${lastLbl}</span><b>${s.recent.toFixed(1)}</b></div>
+          <div class="d-stat"><span>Avg prior ${detail.period === DEFAULT_PERIOD ? bN + "w" : p.short}</span><b>${s.base.toFixed(1)}</b></div>
+          <div class="d-stat"><span>Change</span><span class="badge ${s.status}">${fmtChange(s)}</span></div>
+          <div class="d-stat"><span>vs last year (${lastLbl})</span>${yoy == null ? "<b>—</b>" : `<span class="badge ${yoy > 20 ? "rising" : yoy < -20 ? "falling" : "stable"}">${yoy >= 0 ? "▲" : "▼"} ${Math.abs(yoy).toFixed(0)}%</span>`}</div>
+          ${r != null ? `<div class="d-stat"><span>Search ↔ revenue</span>${corrLabel(r)}</div>` : ""}
+          ${L ? `<div class="d-stat"><span>Lead / lag</span><b class="lagbig ${L.k > 0 ? "lead" : ""}">${esc(lagText(L))}</b></div>` : ""}`;
+        document.getElementById("d-foot").innerHTML =
+          `<span class="lg s">Search interest (0-100)</span>${detail.yoy && lyVals.length ? '<span class="lg ly">Same weeks last year</span>' : ""}${item.rev ? '<span class="lg r">GameBoost revenue (indexed 0-100)</span>' : ""}<span>${esc(STATUS[s.status].label)} · weekly data · latest week may be incomplete</span>`;
+        // lag bars
+        const lagBox = document.getElementById("d-lag");
+        if (detail.lagChart) { detail.lagChart.destroy(); detail.lagChart = null; }
+        lagBox.hidden = !L;
+        if (L) {
+          document.getElementById("d-lag-note").innerHTML = L.k > 0
+            ? `When search moves, sales tend to follow about <b>${L.k} week${L.k > 1 ? "s" : ""}</b> later (r ${L.r.toFixed(2)}). Use search spikes as an early warning for stock, pricing and content.`
+            : L.k < 0 ? `Sales move about <b>${-L.k} week${L.k < -1 ? "s" : ""}</b> before search (r ${L.r.toFixed(2)}). Search is not a forecast here; our own sales drive it more.`
+            : L.k === 0 ? `Search and sales move in the same week (r ${L.r.toFixed(2)}). Good for tracking, but no early warning.`
+            : `No lag gives a solid link (best r ${L.r != null ? L.r.toFixed(2) : "—"}). Sales here depend more on our side (stock, price, rankings) than on market search.`;
+          detail.lagChart = new Chart(document.getElementById("d-lag-canvas").getContext("2d"), {
+            type: "bar",
+            data: { labels: L.list.map(o => o.k === 0 ? "0" : o.k > 0 ? `+${o.k}w` : `${o.k}w`),
+              datasets: [{ data: L.list.map(o => o.r), borderRadius: 3,
+                backgroundColor: L.list.map(o => o.k === L.k ? (o.k > 0 ? "#3DDC84" : "#5AA8F7") : "rgba(154,166,184,.35)") }] },
+            options: { responsive: true, maintainAspectRatio: false, animation: false,
+              plugins: { legend: { display: false }, tooltip: { callbacks: {
+                title: c => { const k = L.list[c[0].dataIndex].k; return k === 0 ? "Same week" : k > 0 ? `Search leads by ${k}w` : `Sales lead by ${-k}w`; },
+                label: c => ` r = ${c.raw == null ? "—" : c.raw.toFixed(2)}` } } },
+              scales: { x: { grid: { display: false }, ticks: { color: "#637085", font: { size: 10 } } },
+                y: { suggestedMin: -0.2, suggestedMax: 1, grid: { color: "rgba(255,255,255,.05)" }, ticks: { color: "#637085", font: { size: 10 }, maxTicksLimit: 4 } } } },
+          });
+        }
+      }
+
       if (detail.chart) detail.chart.destroy();
-      const ctx = document.getElementById("d-canvas").getContext("2d");
-      const grad = ctx.createLinearGradient(0, 0, 0, 480);
-      grad.addColorStop(0, color + "44"); grad.addColorStop(1, color + "00");
-      const fmtWeek = d => new Date(d + "T00:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short", year: w > 30 ? "2-digit" : undefined, timeZone: "UTC" });
-      detail.chart = new Chart(ctx, {
+      detail.chart = new Chart(document.getElementById("d-canvas").getContext("2d"), {
         type: "line",
-        data: { labels, datasets: [
-          { label: "Search", data: item.series.slice(-w), borderColor: color, backgroundColor: grad, borderWidth: 2.4, fill: true, tension: 0.25,
-            pointRadius: w <= 26 ? 3 : 0, pointHoverRadius: 5, pointBackgroundColor: color },
-          ...(item.rev ? [{ label: "Revenue (indexed)", data: item.rev.slice(-w), borderColor: "#5AA8F7", borderWidth: 2, fill: false, tension: 0.25,
-            pointRadius: w <= 26 ? 2.5 : 0, pointHoverRadius: 5, pointBackgroundColor: "#5AA8F7", spanGaps: true }] : []),
-        ] },
+        data: { labels, datasets },
         options: { responsive: true, maintainAspectRatio: false, animation: false,
           interaction: { mode: "index", intersect: false },
-          plugins: { legend: { display: false },
+          plugins: { legend: { display: !!detail.items, position: "bottom", labels: { color: "#9AA6B8", boxWidth: 12, boxHeight: 2, font: { size: 11 } } },
             tooltip: { backgroundColor: "#1D2532", borderColor: "#2C3748", borderWidth: 1, padding: 10, titleColor: "#F4F6FA", bodyColor: "#C9D2DF",
-              callbacks: { title: c => "Week of " + fmtWeek(c[0].label), label: c => ` ${c.dataset.label}: ${c.formattedValue}` } } },
+              callbacks: { title: c => "Week of " + fmtWeek(c[0].label), label: c => ` ${c.dataset.label}: ${c.raw == null ? "—" : c.formattedValue}` } } },
           scales: {
             x: { grid: { color: "rgba(255,255,255,.04)" }, ticks: { color: "#637085", maxRotation: 0, autoSkip: true, maxTicksLimit: 10, callback: (v, i) => fmtWeek(labels[i]) } },
             y: { min: 0, suggestedMax: 100, grid: { color: "rgba(255,255,255,.06)" }, ticks: { color: "#637085", stepSize: 25 } },
@@ -759,6 +972,7 @@
       if (state.period !== DEFAULT_PERIOD) p.set("p", state.period);
       if (state.view !== "cards") p.set("v", state.view);
       if (!state.showRev) p.set("rev", "0");
+      if (state.picks.length) p.set("cmp", state.picks.join("~"));
       history.replaceState(null, "", p.toString() ? "#" + p : location.pathname + location.search);
     }
     function readHash() {
@@ -769,6 +983,7 @@
       setPeriod(p.get("p"));
       state.view = p.get("v") === "table" ? "table" : "cards";
       state.showRev = p.get("rev") !== "0";
+      state.picks = (p.get("cmp") || "").split("~").filter(k => k && itemByKey(k)).slice(0, MAX_PICKS);
       state.sort = ["change_desc", "change_asc", "recent_desc", "az"].includes(p.get("sort")) ? p.get("sort") : "change_desc";
       document.getElementById("q").value = state.q;
       document.getElementById("sort").value = state.sort;
@@ -782,7 +997,7 @@
       rt.classList.toggle("active", state.showRev);
       rt.setAttribute("aria-pressed", state.showRev);
     }
-    function update() { writeHash(); renderTabs(); renderPeriods(); renderViews(); renderHint(); render(); }
+    function update() { writeHash(); renderTabs(); renderPeriods(); renderViews(); renderHint(); render(); syncPicks(); }
 
     function bindControls() {
       let t;
@@ -790,6 +1005,8 @@
       document.getElementById("revtoggle").onclick = () => { state.showRev = !state.showRev; update(); };
       document.getElementById("v-table").onclick = () => { state.view = "table"; update(); };
       document.getElementById("d-close").onclick = closeDetail;
+      document.getElementById("tray-go").onclick = openCompare;
+      document.getElementById("tray-clear").onclick = () => { state.picks = []; syncPicks(); };
       document.getElementById("detail").addEventListener("click", e => { if (e.target.id === "detail") closeDetail(); });
       document.addEventListener("keydown", e => {
         if (e.key === "Escape" && detail) { closeDetail(); return; }
@@ -837,17 +1054,27 @@
 }
     load();
   </script>
+  <div class="tray" id="tray" hidden>
+    <span class="tray-lbl">Compare</span><div class="tray-list" id="tray-list"></div>
+    <button class="tray-go" id="tray-go">Compare</button><button class="tray-clear" id="tray-clear">Clear</button>
+  </div>
+  <div class="flash" id="flash" hidden></div>
   <div class="modal" id="detail" hidden role="dialog" aria-modal="true" aria-labelledby="d-title">
     <div class="modal-box">
       <div class="d-head">
         <div class="thumb d-thumb" id="d-thumb"></div>
         <div class="d-name"><div class="d-title" id="d-title"></div><div class="d-seg" id="d-seg"></div></div>
+        <div class="d-opts" id="d-opts"></div>
         <div class="periods" id="d-periods" role="group" aria-label="Chart period"></div>
         <button class="d-close" id="d-close" aria-label="Close">✕</button>
       </div>
       <div class="d-stats" id="d-stats"></div>
       <div class="d-chart"><canvas id="d-canvas"></canvas></div>
       <div class="d-foot" id="d-foot"></div>
+      <div class="d-lag" id="d-lag" hidden>
+        <div class="d-lag-head"><b>Lead / lag</b><span>Correlation of week-to-week moves (long-term trend removed) when revenue is shifted by N weeks, full 2 years</span></div>
+        <div class="d-lag-body"><div class="d-lag-chart"><canvas id="d-lag-canvas"></canvas></div><p id="d-lag-note"></p></div>
+      </div>
     </div>
   </div>
 </body>
