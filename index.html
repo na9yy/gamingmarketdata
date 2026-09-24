@@ -81,7 +81,13 @@
     .chip.active[data-s="rising"] { background: rgba(61,220,132,.15); color: var(--up); border-color: rgba(61,220,132,.45); }
     .chip.active[data-s="breakout"] { background: rgba(245,184,61,.15); color: var(--new); border-color: rgba(245,184,61,.45); }
     .chip.active[data-s="falling"] { background: rgba(242,85,90,.15); color: var(--down); border-color: rgba(242,85,90,.45); }
-    .controls { display: flex; gap: 8px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .periods { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 4px; gap: 2px; }
+    .period { background: none; border: 0; color: var(--muted); padding: 7px 12px; border-radius: 8px; cursor: pointer;
+      font: 700 13px var(--font); white-space: nowrap; }
+    .period:hover { color: var(--text); }
+    .period.active { background: var(--blue); color: #fff; box-shadow: 0 4px 14px var(--blue-glow); }
+    .period:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
     select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm);
       padding: 9px 12px; font: 600 14px var(--font); }
     .tab:focus-visible, .chip:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible {
@@ -135,6 +141,8 @@
       .wrap { padding: 12px 18px 56px; }
       .section-title { font-size: 26px; }
       .grid { grid-template-columns: minmax(0, 1fr); }
+      .controls, .periods { width: 100%; }
+      .period { flex: 1; padding: 7px 4px; }
     }
   </style>
 </head>
@@ -164,6 +172,7 @@
     <div class="filters">
       <div class="chips" id="chips"></div>
       <div class="controls">
+        <div class="periods" id="periods" role="group" aria-label="Time period"></div>
         <select id="sort" aria-label="Sort">
           <option value="change_desc">Biggest risers</option>
           <option value="change_asc">Biggest fallers</option>
@@ -181,7 +190,16 @@
     const WEEK = 7 * 864e5;
     const MIN_ACTIVE_WEEKS = 3;   // fewer non-zero weeks than this in the window = "Low data"
     const CHART_WEEKS = 104;
-    const WINDOW = "4-12";        // last 4 weeks vs prior 12. Change here if needed (e.g. "12-12", "26-26", "52-52")
+    // Period filter: chart shows only this period, and it is compared to the same length right before it
+    const PERIODS = {
+      "2y":  { label: "Last 2 years",   short: "2Y",  weeks: CHART_WEEKS, win: "4-12" }, // default: full history, last 4 wks vs prior 12
+      "2w":  { label: "Last 2 weeks",   short: "2W",  weeks: 2,  text: "2 weeks" },
+      "1m":  { label: "Last month",     short: "1M",  weeks: 4,  text: "month" },
+      "3m":  { label: "Last 3 months",  short: "3M",  weeks: 13, text: "3 months" },
+      "6m":  { label: "Last 6 months",  short: "6M",  weeks: 26, text: "6 months" },
+      "12m": { label: "Last 12 months", short: "12M", weeks: 52, text: "12 months" },
+    };
+    const DEFAULT_PERIOD = "2y";        // last 4 weeks vs prior 12. Change here if needed (e.g. "12-12", "26-26", "52-52")
     const THRESHOLD = 20;         // % change needed to count as Rising / Falling      // how much history each sparkline shows (104 = 2 years)
 
     const STATUS = {
@@ -215,7 +233,7 @@
     };
 
     let DATA = null, GRID = [], ITEMS = [];
-    const state = { segment: "All", status: "all", q: "", win: WINDOW, thr: THRESHOLD, sort: "change_desc" };
+    const state = { segment: "All", status: "all", q: "", period: DEFAULT_PERIOD, win: "4-12", thr: THRESHOLD, sort: "change_desc" };
     const charts = new Map();
     let observer = null;
 
@@ -304,7 +322,7 @@
           <div class="name">${title}<div class="seg">${esc(segment || "")}</div></div>
           <div class="val"><div class="num">${s.latest}</div><span class="badge ${s.status}">${fmtChange(s)}</span></div>
         </div>
-        <div class="sub">Avg ${s.recent.toFixed(1)} in the last ${rN} weeks vs ${s.base.toFixed(1)} in the ${bN} before. ${STATUS[s.status].label}.</div>
+        <div class="sub">${compareText(s)} ${STATUS[s.status].label}.</div>
         <div class="chart-box"><canvas></canvas></div>`;
       card._item = item;
       return card;
@@ -314,8 +332,8 @@
       if (charts.has(card)) return;
       const { series, s } = card._item;
       const canvas = card.querySelector("canvas");
-      const pts = series.slice(-CHART_WEEKS), labels = GRID.slice(-CHART_WEEKS);
-      const [rN] = state.win.split("-").map(Number);
+      const w = PERIODS[state.period].weeks;
+      const pts = series.slice(-w), labels = GRID.slice(-w);
       const color = COLORS[s.status];
       const ctx = canvas.getContext("2d");
       const grad = ctx.createLinearGradient(0, 0, 0, 96);
@@ -324,9 +342,12 @@
         type: "line",
         data: { labels, datasets: [{
           data: pts, borderColor: color, backgroundColor: grad,
-          borderWidth: 2, fill: true, pointRadius: 0, tension: 0.25,
-          // dim everything before the "recent" window so the comparison is visible
-          segment: { borderColor: c => c.p1DataIndex >= pts.length - rN ? color : color + "66" },
+          borderWidth: 2, fill: true, tension: 0.25,
+          pointRadius: pts.length <= 13 ? 3 : 0, pointBackgroundColor: color, pointBorderWidth: 0,
+          // default view: dim everything before the "recent" window so the comparison is visible
+          segment: state.period === DEFAULT_PERIOD
+            ? { borderColor: c => c.p1DataIndex >= pts.length - Number(state.win.split("-")[0]) ? color : color + "66" }
+            : {},
         }] },
         options: { responsive: true, maintainAspectRatio: false, animation: false,
           plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
@@ -412,21 +433,51 @@
     }
 
     function renderHint() {
+      const p = PERIODS[state.period];
       const [rN, bN] = state.win.split("-");
       const last = GRID[GRID.length - 1];
       document.getElementById("hint").textContent =
-        `Compares avg interest in the last ${rN} weeks to the ${bN} weeks before. ` +
+        (state.period === DEFAULT_PERIOD
+          ? `Charts show the last 2 years (weekly data). Change compares avg interest in the last ${rN} weeks to the ${bN} weeks before. `
+          : `Charts show the ${p.label.toLowerCase()} (weekly data). Change compares its avg interest to the ${p.text} before. `) +
         `Rising/Falling = change beyond ±${state.thr}%. Breakout = zero before, active now. ` +
-        `Low data = under ${MIN_ACTIVE_WEEKS} active weeks in the window. Latest week: ${last || "—"}.`;
+        `Low data = under ${MIN_ACTIVE_WEEKS} active weeks. Latest week: ${last || "—"}.`;
     }
 
-    // Keep filters in the URL so a filtered view can be shared
+    function setPeriod(key) {
+      state.period = PERIODS[key] ? key : DEFAULT_PERIOD;
+      const p = PERIODS[state.period];
+      state.win = p.win || `${p.weeks}-${p.weeks}`;
+    }
+
+    function compareText(s) {
+      const p = PERIODS[state.period];
+      if (state.period === DEFAULT_PERIOD) {
+        const [rN, bN] = state.win.split("-");
+        return `Avg ${s.recent.toFixed(1)} in the last ${rN} weeks vs ${s.base.toFixed(1)} in the ${bN} before.`;
+      }
+      return `Avg ${s.recent.toFixed(1)} in the last ${p.text} vs ${s.base.toFixed(1)} in the ${p.text} before.`;
+    }
+
+    function renderPeriods() {
+      const box = document.getElementById("periods");
+      box.innerHTML = "";
+      for (const [key, p] of Object.entries(PERIODS)) {
+        const b = document.createElement("button");
+        b.className = "period" + (key === state.period ? " active" : "");
+        b.textContent = p.short; b.title = p.label; b.setAttribute("aria-pressed", key === state.period);
+        b.onclick = () => { setPeriod(key); update(); };
+        box.appendChild(b);
+      }
+    }
+
     function writeHash() {
       const p = new URLSearchParams();
       if (state.segment !== "All") p.set("seg", state.segment);
       if (state.status !== "all") p.set("status", state.status);
       if (state.q) p.set("q", state.q);
       if (state.sort !== "change_desc") p.set("sort", state.sort);
+      if (state.period !== DEFAULT_PERIOD) p.set("p", state.period);
       history.replaceState(null, "", p.toString() ? "#" + p : location.pathname + location.search);
     }
     function readHash() {
@@ -434,12 +485,13 @@
       state.segment = p.get("seg") || "All";
       state.status = STATUS[p.get("status")] ? p.get("status") : "all";
       state.q = p.get("q") || "";
+      setPeriod(p.get("p"));
       state.sort = ["change_desc", "change_asc", "recent_desc", "az"].includes(p.get("sort")) ? p.get("sort") : "change_desc";
       document.getElementById("q").value = state.q;
       document.getElementById("sort").value = state.sort;
     }
 
-    function update() { writeHash(); renderTabs(); renderHint(); render(); }
+    function update() { writeHash(); renderTabs(); renderPeriods(); renderHint(); render(); }
 
     function bindControls() {
       let t;
