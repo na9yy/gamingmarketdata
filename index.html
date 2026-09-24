@@ -65,6 +65,13 @@
     .period:hover { color: var(--text); }
     .period.active { background: var(--blue); color: #fff; }
     select { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; font-size: 12px; font-weight: 700; }
+    .revtoggle { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+      padding: 5px 9px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; }
+    .revtoggle .sw { width: 12px; height: 2px; border-radius: 2px; background: var(--faint); }
+    .revtoggle.active { color: var(--text); border-color: rgba(90,168,247,.45); background: rgba(90,168,247,.1); }
+    .revtoggle.active .sw { background: #5AA8F7; }
+    .revtoggle:hover { color: var(--text); }
+    .revtoggle[hidden] { display: none; }
     .views { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; }
     .views button { background: none; border: 0; color: var(--muted); padding: 4px 7px; border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
     .views button svg { width: 14px; height: 14px; }
@@ -181,6 +188,7 @@
           <option value="recent_desc">Highest recent interest</option>
           <option value="az">A–Z</option>
         </select>
+        <button class="revtoggle" id="revtoggle" hidden aria-pressed="true" title="Show or hide the indexed revenue line on top products"><span class="sw"></span>Revenue</button>
         <div class="views" role="group" aria-label="View">
           <button id="v-cards" title="Cards" aria-label="Cards view"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></button>
           <button id="v-table" title="Table" aria-label="Table view"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
@@ -253,7 +261,7 @@
     };
 
     let DATA = null, GRID = [], ITEMS = [], REV = null;
-    const state = { segment: "All", status: "all", q: "", view: "cards", period: DEFAULT_PERIOD, win: "4-12", thr: THRESHOLD, sort: "change_desc" };
+    const state = { segment: "All", status: "all", q: "", view: "cards", showRev: true, period: DEFAULT_PERIOD, win: "4-12", thr: THRESHOLD, sort: "change_desc" };
     const charts = new Map();
     let observer = null;
 
@@ -562,7 +570,7 @@
             .map(i => ({ ...i, s: score(i.series) }))
             // gift cards: prefer the plain "<brand> Gift Card" keyword over sub-products like Game Pass
             .sort((a, b) => (g.brands ? (/gift card/i.test(b.keyword) - /gift card/i.test(a.keyword)) : 0) || b.s.recent - a.s.recent)[0];
-          if (m && !picks.some(p => p.keyword === m.keyword)) picks.push({ ...m, rev: revenueSeries(g.revKey, key) });
+          if (m && !picks.some(p => p.keyword === m.keyword)) picks.push({ ...m, rev: state.showRev ? revenueSeries(g.revKey, key) : null });
         }
         if (!picks.length) continue;
         picks.sort(sortFn);
@@ -643,6 +651,7 @@
       if (state.sort !== "change_desc") p.set("sort", state.sort);
       if (state.period !== DEFAULT_PERIOD) p.set("p", state.period);
       if (state.view !== "cards") p.set("v", state.view);
+      if (!state.showRev) p.set("rev", "0");
       history.replaceState(null, "", p.toString() ? "#" + p : location.pathname + location.search);
     }
     function readHash() {
@@ -652,6 +661,7 @@
       state.q = p.get("q") || "";
       setPeriod(p.get("p"));
       state.view = p.get("v") === "table" ? "table" : "cards";
+      state.showRev = p.get("rev") !== "0";
       state.sort = ["change_desc", "change_asc", "recent_desc", "az"].includes(p.get("sort")) ? p.get("sort") : "change_desc";
       document.getElementById("q").value = state.q;
       document.getElementById("sort").value = state.sort;
@@ -660,12 +670,17 @@
     function renderViews() {
       document.getElementById("v-cards").classList.toggle("active", state.view === "cards");
       document.getElementById("v-table").classList.toggle("active", state.view === "table");
+      const rt = document.getElementById("revtoggle");
+      rt.hidden = !REV;
+      rt.classList.toggle("active", state.showRev);
+      rt.setAttribute("aria-pressed", state.showRev);
     }
     function update() { writeHash(); renderTabs(); renderPeriods(); renderViews(); renderHint(); render(); }
 
     function bindControls() {
       let t;
       document.getElementById("v-cards").onclick = () => { state.view = "cards"; update(); };
+      document.getElementById("revtoggle").onclick = () => { state.showRev = !state.showRev; update(); };
       document.getElementById("v-table").onclick = () => { state.view = "table"; update(); };
       document.addEventListener("keydown", e => {
         if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); document.getElementById("q").focus(); }
