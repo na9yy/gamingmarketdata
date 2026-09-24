@@ -496,11 +496,13 @@
     // Game slugs of GameBoost's biggest products per category. Edit these lists to change the section.
     const TOP_PRODUCTS = [
       { title: "Top GameBoost Accounts This Year", segs: ["Accounts"],
-        games: ["clash-of-clans","clash-royale","valorant","league-of-legends","call-of-duty","raid-shadow-legends","grand-theft-auto-v","brawl-stars","pubg-mobile","rocket-league","summoners-war","genshin-impact"] },
-      { title: "Top GameBoost Top Ups & Currencies This Year", segs: ["Top Ups", "Currencies"],
-        games: ["fortnite","roblox","pubg-mobile","valorant","genshin-impact","pokemon-go","donutsmp","blade-ball","mobile-legends","old-school-runescape","wow-classic-era","apex-legends"] },
+        games: ["fortnite","valorant","clash-of-clans","grand-theft-auto-v","league-of-legends","brawl-stars","call-of-duty","raid-shadow-legends","pubg-mobile","pokemon-go","rainbow-six-siege","clash-royale","summoners-war","roblox"] },
       { title: "Top GameBoost Items This Year", segs: ["Items"],
-        games: ["steal-a-brainrot","grow-a-garden","grow-a-garden-2","murder-mystery-2","blox-fruits","adopt-me","plants-vs-brainrots","arc-raiders","clash-of-clans","growtopia","pubg-mobile","brawl-stars"] },
+        games: ["steal-a-brainrot","grow-a-garden-2","call-of-duty","roblox","adopt-me","murder-mystery-2","blox-fruits","arc-raiders","clash-of-clans","fortnite","pubg-mobile","pokemon-go","brawl-stars","donutsmp"] },
+      { title: "Top GameBoost Currencies This Year", segs: ["Currencies", "Top Ups"],
+        games: ["fortnite","roblox","genshin-impact","valorant","mobile-legends","pokemon-go","wow-classic-era","pubg-mobile","donutsmp","blade-ball","fc-26","honkai-star-rail","old-school-runescape","clash-of-clans"] },
+      { title: "Top GameBoost Gift Cards This Year", segs: ["Gift Cards"],
+        brands: ["PlayStation","Steam","Nintendo","Eneba","Apple","Xbox","Roblox","Valorant","Amazon","Razer","Kinguin","Discord Nitro","iTunes","A-bon"] },
     ];
     function renderTop(content) {
       if (state.q || state.status !== "all") return;
@@ -508,10 +510,15 @@
       for (const g of groups) {
         // best trend keyword per game in these categories (highest recent interest)
         const picks = [];
-        for (const slug of g.games) {
-          const m = ITEMS.filter(i => g.segs.includes(i.segment) && gameSlug(i.keyword) === slug)
+        for (const key of (g.games || g.brands)) {
+          const b = normName(key);
+          const hit = g.brands
+            ? i => { const k = normName(i.keyword); return k === b || k.startsWith(b + " "); }
+            : i => gameSlug(i.keyword) === key;
+          const m = ITEMS.filter(i => g.segs.includes(i.segment) && hit(i))
             .map(i => ({ ...i, s: score(i.series) }))
-            .sort((a, b) => b.s.recent - a.s.recent)[0];
+            // gift cards: prefer the plain "<brand> Gift Card" keyword over sub-products like Game Pass
+            .sort((a, b) => (g.brands ? (/gift card/i.test(b.keyword) - /gift card/i.test(a.keyword)) : 0) || b.s.recent - a.s.recent)[0];
           if (m && !picks.some(p => p.keyword === m.keyword)) picks.push(m);
         }
         if (!picks.length) continue;
