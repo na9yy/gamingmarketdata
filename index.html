@@ -109,6 +109,12 @@
     .badge.breakout { background: rgba(245,184,61,.14); color: var(--new); }
     .badge.falling { background: rgba(242,85,90,.14); color: var(--down); }
     .badge.stable, .badge.low { background: var(--panel-2); color: var(--muted); }
+    .rev { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 2px 6px; margin-top: 7px; font-size: 11px; font-variant-numeric: tabular-nums; }
+    .rev .rk { color: var(--blue-light); font-weight: 800; }
+    .rev b { font-size: 13px; font-weight: 800; }
+    .rev .lbl { color: var(--faint); }
+    .rev .rbar { grid-column: 1 / -1; height: 4px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+    .rev .rbar i { display: block; height: 100%; background: var(--blue); border-radius: 3px; }
     .sub { font-size: 11px; color: var(--faint); margin-top: 6px; font-variant-numeric: tabular-nums; }
     .sub b { color: var(--muted); font-weight: 700; }
     .chart-box { position: relative; height: 64px; margin: 2px -4px 0; min-width: 0; }
@@ -121,7 +127,8 @@
       text-transform: uppercase; letter-spacing: .04em; cursor: pointer; user-select: none; }
     th:hover { color: var(--text); }
     th.on { color: var(--blue-light); }
-    th:first-child, td:first-child, th:nth-child(2) { text-align: left; }
+    th:first-child, td:first-child { text-align: left; }
+    th.left { text-align: left; }
     table { table-layout: fixed; min-width: 760px; }
     td .kw { overflow: hidden; text-overflow: ellipsis; }
     tr:last-child td { border-bottom: 0; }
@@ -172,6 +179,7 @@
           <option value="change_desc">Biggest risers</option>
           <option value="change_asc">Biggest fallers</option>
           <option value="recent_desc">Highest recent interest</option>
+          <option value="rev_desc">Highest revenue (top lists)</option>
           <option value="az">A–Z</option>
         </select>
         <div class="views" role="group" aria-label="View">
@@ -298,13 +306,15 @@
       // Tier: 0 = real data, 1 = low data, 2 = zero in the window (always last)
       const tier = i => i.s.status !== "low" ? 0 : (i.s.recent > 0 || i.s.base > 0) ? 1 : 2;
       const t = tier(a) - tier(b);
-      if (t !== 0) return t;
+      if (t !== 0 && !(state.sort === "rev_desc" && a.rev != null && b.rev != null)) return t;
 
       const cmp = (x, y) => (x === y ? 0 : x > y ? 1 : -1);
       switch (state.sort) {
         case "change_asc":  return cmp(a.s.change ?? Infinity, b.s.change ?? Infinity);
         case "recent_desc": return b.s.recent - a.s.recent;
         case "az":          return a.keyword.localeCompare(b.keyword);
+        case "rev_desc":    if (a.rev != null || b.rev != null) return (b.rev ?? -1) - (a.rev ?? -1);
+                            return cmp(b.s.change ?? -Infinity, a.s.change ?? -Infinity);
         default:            return cmp(b.s.change ?? -Infinity, a.s.change ?? -Infinity);
       }
     }
@@ -393,18 +403,20 @@
 
     // Table view: one dense sortable row per keyword
     const COLS = [
-      { key: "az", label: "Keyword" }, { key: null, label: "Category" }, { key: null, label: "Latest" },
+      { key: "az", label: "Keyword" }, { key: null, label: "Category", left: true }, { key: null, label: "Latest" },
       { key: "recent_desc", label: "Recent avg" }, { key: null, label: "Prior avg" },
       { key: "change_desc", alt: "change_asc", label: "Change" }, { key: null, label: "Trend" },
     ];
     function keywordTable(list) {
       const wrap = document.createElement("div"); wrap.className = "tbl-wrap";
-      const head = COLS.map(c => {
+      const hasRev = list.some(i => i.rev != null);
+      const cols = hasRev ? [COLS[0], { key: "rev_desc", label: "Revenue 2026" }, ...COLS.slice(1)] : COLS;
+      const head = cols.map(c => {
         const on = c.key && (state.sort === c.key || state.sort === c.alt);
         const arrow = on ? (state.sort === "change_asc" ? " ▲" : state.sort === "az" ? " ▲" : " ▼") : "";
-        return `<th data-k="${c.key || ""}" data-alt="${c.alt || ""}" class="${on ? "on" : ""}">${c.label}${arrow}</th>`;
+        return `<th data-k="${c.key || ""}" data-alt="${c.alt || ""}" class="${on ? "on" : ""}${c.left ? " left" : ""}">${c.label}${arrow}</th>`;
       }).join("");
-      wrap.innerHTML = `<table><colgroup><col style="width:32%"><col style="width:11%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:18%"></colgroup><thead><tr>${head}</tr></thead><tbody></tbody></table>`;
+      wrap.innerHTML = `<table><colgroup>${hasRev ? '<col style="width:26%"><col style="width:12%">' : '<col style="width:32%">'}<col style="width:10%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:17%"></colgroup><thead><tr>${head}</tr></thead><tbody></tbody></table>`;
       wrap.querySelectorAll("th").forEach(th => {
         const k = th.dataset.k; if (!k) { th.style.cursor = "default"; return; }
         th.onclick = () => { state.sort = state.sort === k && th.dataset.alt ? th.dataset.alt : k; document.getElementById("sort").value = state.sort; update(); };
@@ -415,7 +427,7 @@
         const { thumb, title } = identity(item);
         const tr = document.createElement("tr");
         if (s.status === "low") tr.className = "dim";
-        tr.innerHTML = `<td><div class="cell"><div class="thumb">${thumb}</div>${title}</div></td>
+        tr.innerHTML = `<td><div class="cell"><div class="thumb">${thumb}</div>${title}</div></td>${hasRev ? `<td class="num2">${item.rev != null ? fmtEur(item.rev, true) : "—"}</td>` : ""}
           <td class="segc">${esc(segment)}</td><td class="num2">${s.latest}</td>
           <td>${s.recent.toFixed(1)}</td><td>${s.base.toFixed(1)}</td>
           <td><span class="badge ${s.status}">${fmtChange(s)}</span></td>
@@ -496,12 +508,16 @@
     // Game slugs of GameBoost's biggest products per category. Edit these lists to change the section.
     const TOP_PRODUCTS = [
       { title: "Top GameBoost Accounts This Year", segs: ["Accounts"],
+        revenue: [1644099.25, 1001767.85, 703370.02, 659192.86, 588716.48, 534144.57, 461103.37, 351039.53, 245261.53, 145821.26, 137013.44, 128809.04, 121231.46, 118664.24], // € this year, same order as the list
         games: ["fortnite","valorant","clash-of-clans","grand-theft-auto-v","league-of-legends","brawl-stars","call-of-duty","raid-shadow-legends","pubg-mobile","pokemon-go","rainbow-six-siege","clash-royale","summoners-war","roblox"] },
       { title: "Top GameBoost Items This Year", segs: ["Items"],
+        revenue: [711484.52, 88151.4, 73576.39, 46223.92, 43726.77, 40211.11, 37602.93, 37366.09, 33374.96, 31042.62, 26703.76, 23330.28, 18011.35, 16331.02], // € this year, same order as the list
         games: ["steal-a-brainrot","grow-a-garden-2","call-of-duty","roblox","adopt-me","murder-mystery-2","blox-fruits","arc-raiders","clash-of-clans","fortnite","pubg-mobile","pokemon-go","brawl-stars","donutsmp"] },
       { title: "Top GameBoost Currencies This Year", segs: ["Currencies", "Top Ups"],
+        revenue: [238514.74, 163671.03, 130249.99, 123593.51, 108802.3, 87773.25, 85150.28, 74090.87, 48222.53, 41520.33, 33235.9, 31808.76, 30491.16, 23534.69], // € this year, same order as the list
         games: ["fortnite","roblox","genshin-impact","valorant","mobile-legends","pokemon-go","wow-classic-era","pubg-mobile","donutsmp","blade-ball","fc-26","honkai-star-rail","old-school-runescape","clash-of-clans"] },
       { title: "Top GameBoost Gift Cards This Year", segs: ["Gift Cards"],
+        revenue: [140034.7, 63921.29, 38505.38, 36501.91, 29784.62, 29313.46, 28125.7, 20168.36, 8759.33, 6839.03, 6064.87, 4224.57, 2966.44, 2167.75], // € this year, same order as the list
         brands: ["PlayStation","Steam","Nintendo","Eneba","Apple","Xbox","Roblox","Valorant","Amazon","Razer","Kinguin","Discord Nitro","iTunes","A-bon"] },
     ];
     function renderTop(content) {
@@ -519,7 +535,8 @@
             .map(i => ({ ...i, s: score(i.series) }))
             // gift cards: prefer the plain "<brand> Gift Card" keyword over sub-products like Game Pass
             .sort((a, b) => (g.brands ? (/gift card/i.test(b.keyword) - /gift card/i.test(a.keyword)) : 0) || b.s.recent - a.s.recent)[0];
-          if (m && !picks.some(p => p.keyword === m.keyword)) picks.push(m);
+          const idx = (g.games || g.brands).indexOf(key);
+          if (m && !picks.some(p => p.keyword === m.keyword)) picks.push({ ...m, rev: g.revenue ? g.revenue[idx] : null, rank: idx + 1, product: key });
         }
         if (!picks.length) continue;
         picks.sort(sortFn);
@@ -529,9 +546,21 @@
         content.appendChild(title);
         const grid = document.createElement("div"); grid.className = "grid";
         if (state.view === "table") { content.appendChild(keywordTable(picks)); continue; }
-        for (const i of picks) { const c = keywordCard(i); c.classList.add("top-card"); grid.appendChild(c); observe(c); }
+        const maxRev = Math.max(...picks.map(p => p.rev || 0), 1);
+        for (const i of picks) {
+          const c = keywordCard(i); c.classList.add("top-card");
+          if (i.rev != null) c.querySelector(".top").insertAdjacentHTML("afterend",
+            `<div class="rev" title="${fmtEur(i.rev, true)} revenue this year"><span class="rk">#${i.rank}</span><b>${fmtEur(i.rev)}</b><span class="lbl">revenue 2026</span>
+             <span class="rbar"><i style="width:${Math.max(2, i.rev / maxRev * 100).toFixed(1)}%"></i></span></div>`);
+          grid.appendChild(c); observe(c);
+        }
         content.appendChild(grid);
       }
+    }
+
+    function fmtEur(v, full) {
+      if (full) return "€" + v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return v >= 1e6 ? "€" + (v / 1e6).toFixed(2) + "M" : v >= 1e3 ? "€" + (v / 1e3).toFixed(1) + "K" : "€" + v.toFixed(0);
     }
 
     function renderTabs() {
@@ -604,7 +633,7 @@
       state.q = p.get("q") || "";
       setPeriod(p.get("p"));
       state.view = p.get("v") === "table" ? "table" : "cards";
-      state.sort = ["change_desc", "change_asc", "recent_desc", "az"].includes(p.get("sort")) ? p.get("sort") : "change_desc";
+      state.sort = ["change_desc", "change_asc", "recent_desc", "rev_desc", "az"].includes(p.get("sort")) ? p.get("sort") : "change_desc";
       document.getElementById("q").value = state.q;
       document.getElementById("sort").value = state.sort;
     }
