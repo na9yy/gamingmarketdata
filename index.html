@@ -150,6 +150,37 @@
     td.spark { padding: 2px 10px; }
     td.spark div { position: relative; height: 26px; width: 100%; }
 
+    /* click a chart -> big view */
+    .card { cursor: zoom-in; }
+    tbody tr { cursor: zoom-in; }
+    .modal { position: fixed; inset: 0; z-index: 50; background: rgba(5,8,13,.72); backdrop-filter: blur(4px);
+      display: grid; place-items: center; padding: 24px; }
+    .modal[hidden] { display: none; }
+    .modal-box { width: min(1200px, 100%); max-height: 100%; overflow: auto; background: var(--panel); border: 1px solid var(--border);
+      border-radius: 14px; padding: 16px 18px 12px; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+    .d-head { display: flex; align-items: center; gap: 12px; }
+    .d-thumb { width: 40px; height: 40px; border-radius: 9px; font-size: 12px; }
+    .d-name { flex: 1; min-width: 0; }
+    .d-title { font-size: 18px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .d-title a { color: inherit; text-decoration: none; } .d-title a:hover { color: var(--blue-light); }
+    .d-seg { color: var(--faint); font-size: 12px; }
+    .d-close { background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); width: 32px; height: 32px; border-radius: 8px;
+      cursor: pointer; font-size: 14px; }
+    .d-close:hover { color: var(--text); }
+    .d-stats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 14px 0 6px; font-variant-numeric: tabular-nums; }
+    .d-stat > span:first-child { display: block; font-size: 11px; color: var(--faint); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .d-stat b { font-size: 18px; font-weight: 800; }
+    .d-stat .badge { font-size: 13px; margin-top: 4px; }
+    .d-stat .corr { display: inline-block; margin: 4px 0 0; font-size: 14px; }
+    .d-chart { position: relative; height: min(58vh, 520px); margin-top: 6px; }
+    .d-foot { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; color: var(--faint); font-size: 12px; margin-top: 8px; }
+    @media (max-width: 760px) {
+      .modal { padding: 8px; }
+      .d-head { flex-wrap: wrap; }
+      #d-periods { order: 3; flex: 1 1 100%; width: 100%; }
+      .d-chart { height: 50vh; }
+    }
+
     .empty, .error { background: var(--panel); border: 1px dashed var(--border); border-radius: 10px; padding: 30px; text-align: center; color: var(--muted); margin-top: 12px; }
     .error { color: var(--down); }
 
@@ -361,6 +392,7 @@
         <div class="sub">${compareText(s)}</div>
         <div class="chart-box"><canvas></canvas></div>`;
       card._item = item;
+      card.addEventListener("click", e => { if (!e.target.closest("a")) openDetail(card._item); });
       return card;
     }
 
@@ -443,6 +475,7 @@
           <td><span class="badge ${s.status}">${fmtChange(s)}</span></td>${hasRev ? `<td>${item.rev ? corrLabel(corrFor(item)) : "—"}</td>` : ""}
           <td class="spark"><div><canvas></canvas></div></td>`;
         tr._item = item;
+        tr.addEventListener("click", e => { if (!e.target.closest("a")) openDetail(item); });
         tb.appendChild(tr); observe(tr);
       }
       return wrap;
@@ -590,6 +623,80 @@
       }
     }
 
+    // ---------- Big chart view ----------
+    let detail = null; // { item, period, chart }
+    function openDetail(item) {
+      detail = { item, period: state.period, chart: null };
+      const { thumb, title } = identity(item);
+      document.getElementById("d-thumb").innerHTML = thumb;
+      document.getElementById("d-title").innerHTML = title.replace('class="kw"', "");
+      document.getElementById("d-seg").textContent = item.segment;
+      const m = document.getElementById("detail");
+      m.hidden = false;
+      document.body.style.overflow = "hidden";
+      drawDetail();
+      document.getElementById("d-close").focus();
+    }
+    function closeDetail() {
+      if (!detail) return;
+      if (detail.chart) detail.chart.destroy();
+      detail = null;
+      document.getElementById("detail").hidden = true;
+      document.body.style.overflow = "";
+    }
+    function drawDetail() {
+      const { item } = detail;
+      const p = PERIODS[detail.period], w = p.weeks;
+      // periods inside the big view
+      const box = document.getElementById("d-periods"); box.innerHTML = "";
+      for (const [key, pp] of Object.entries(PERIODS)) {
+        const b = document.createElement("button");
+        b.className = "period" + (key === detail.period ? " active" : "");
+        b.textContent = pp.short; b.title = pp.label;
+        b.onclick = () => { detail.period = key; drawDetail(); };
+        box.appendChild(b);
+      }
+      // stats for this period (same rules as the cards)
+      const saved = [state.period, state.win];
+      setPeriod(detail.period);
+      const s = score(item.series), r = item.rev ? correlation(item.series.slice(-w), item.rev.slice(-w)) : null, cmp = compareText(s);
+      [state.period, state.win] = saved;
+      const [rN, bN] = (PERIODS[detail.period].win || `${w}-${w}`).split("-");
+      document.getElementById("d-stats").innerHTML = `
+        <div class="d-stat"><span>Latest week</span><b>${s.latest}</b></div>
+        <div class="d-stat"><span>Avg last ${detail.period === DEFAULT_PERIOD ? rN + "w" : p.short}</span><b>${s.recent.toFixed(1)}</b></div>
+        <div class="d-stat"><span>Avg prior ${detail.period === DEFAULT_PERIOD ? bN + "w" : p.short}</span><b>${s.base.toFixed(1)}</b></div>
+        <div class="d-stat"><span>Change</span><span class="badge ${s.status}">${fmtChange(s)}</span></div>
+        ${r != null ? `<div class="d-stat"><span>Search ↔ revenue</span>${corrLabel(r)}</div>` : ""}`;
+      document.getElementById("d-foot").innerHTML =
+        `<span class="lg s">Google search interest (0-100)</span>${item.rev ? '<span class="lg r">GameBoost revenue (indexed 0-100)</span>' : ""}<span>${esc(STATUS[s.status].label)} · weekly data · latest week may be incomplete</span>`;
+
+      const labels = GRID.slice(-w), color = COLORS[s.status];
+      if (detail.chart) detail.chart.destroy();
+      const ctx = document.getElementById("d-canvas").getContext("2d");
+      const grad = ctx.createLinearGradient(0, 0, 0, 480);
+      grad.addColorStop(0, color + "44"); grad.addColorStop(1, color + "00");
+      const fmtWeek = d => new Date(d + "T00:00:00Z").toLocaleDateString(undefined, { day: "numeric", month: "short", year: w > 30 ? "2-digit" : undefined, timeZone: "UTC" });
+      detail.chart = new Chart(ctx, {
+        type: "line",
+        data: { labels, datasets: [
+          { label: "Search", data: item.series.slice(-w), borderColor: color, backgroundColor: grad, borderWidth: 2.4, fill: true, tension: 0.25,
+            pointRadius: w <= 26 ? 3 : 0, pointHoverRadius: 5, pointBackgroundColor: color },
+          ...(item.rev ? [{ label: "Revenue (indexed)", data: item.rev.slice(-w), borderColor: "#5AA8F7", borderWidth: 2, fill: false, tension: 0.25,
+            pointRadius: w <= 26 ? 2.5 : 0, pointHoverRadius: 5, pointBackgroundColor: "#5AA8F7", spanGaps: true }] : []),
+        ] },
+        options: { responsive: true, maintainAspectRatio: false, animation: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: { legend: { display: false },
+            tooltip: { backgroundColor: "#1D2532", borderColor: "#2C3748", borderWidth: 1, padding: 10, titleColor: "#F4F6FA", bodyColor: "#C9D2DF",
+              callbacks: { title: c => "Week of " + fmtWeek(c[0].label), label: c => ` ${c.dataset.label}: ${c.formattedValue}` } } },
+          scales: {
+            x: { grid: { color: "rgba(255,255,255,.04)" }, ticks: { color: "#637085", maxRotation: 0, autoSkip: true, maxTicksLimit: 10, callback: (v, i) => fmtWeek(labels[i]) } },
+            y: { min: 0, suggestedMax: 100, grid: { color: "rgba(255,255,255,.06)" }, ticks: { color: "#637085", stepSize: 25 } },
+          } },
+      });
+    }
+
     function renderTabs() {
       const tabs = document.getElementById("tabs");
       tabs.innerHTML = "";
@@ -682,7 +789,10 @@
       document.getElementById("v-cards").onclick = () => { state.view = "cards"; update(); };
       document.getElementById("revtoggle").onclick = () => { state.showRev = !state.showRev; update(); };
       document.getElementById("v-table").onclick = () => { state.view = "table"; update(); };
+      document.getElementById("d-close").onclick = closeDetail;
+      document.getElementById("detail").addEventListener("click", e => { if (e.target.id === "detail") closeDetail(); });
       document.addEventListener("keydown", e => {
+        if (e.key === "Escape" && detail) { closeDetail(); return; }
         if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); document.getElementById("q").focus(); }
         if (e.key === "Escape" && document.activeElement.id === "q") { e.target.value = ""; state.q = ""; update(); }
       });
@@ -727,5 +837,18 @@
 }
     load();
   </script>
+  <div class="modal" id="detail" hidden role="dialog" aria-modal="true" aria-labelledby="d-title">
+    <div class="modal-box">
+      <div class="d-head">
+        <div class="thumb d-thumb" id="d-thumb"></div>
+        <div class="d-name"><div class="d-title" id="d-title"></div><div class="d-seg" id="d-seg"></div></div>
+        <div class="periods" id="d-periods" role="group" aria-label="Chart period"></div>
+        <button class="d-close" id="d-close" aria-label="Close">✕</button>
+      </div>
+      <div class="d-stats" id="d-stats"></div>
+      <div class="d-chart"><canvas id="d-canvas"></canvas></div>
+      <div class="d-foot" id="d-foot"></div>
+    </div>
+  </div>
 </body>
 </html>
