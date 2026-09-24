@@ -109,6 +109,12 @@
     .badge.breakout { background: rgba(245,184,61,.14); color: var(--new); }
     .badge.falling { background: rgba(242,85,90,.14); color: var(--down); }
     .badge.stable, .badge.low { background: var(--panel-2); color: var(--muted); }
+    .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; font-size: 11px; color: var(--faint); }
+    .lg::before { content: ""; display: inline-block; width: 10px; height: 2px; margin-right: 4px; vertical-align: middle; background: var(--muted); border-radius: 2px; }
+    .lg.r::before { background: #5AA8F7; }
+    .corr { margin-left: auto; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .corr.pos { color: var(--up); } .corr.neg { color: var(--down); }
+    td .corr { margin: 0; }
     .sub { font-size: 11px; color: var(--faint); margin-top: 6px; font-variant-numeric: tabular-nums; }
     .sub b { color: var(--muted); font-weight: 700; }
     .chart-box { position: relative; height: 64px; margin: 2px -4px 0; min-width: 0; }
@@ -246,7 +252,7 @@
       "Top Ups": '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v2.1A6 6 0 0 0 11.1 18H6a3 3 0 0 1-3-3V7Zm2 1h12V7a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v1Z"/><circle cx="17" cy="16" r="5"/><path d="M17 13.5v5M14.5 16h5" stroke="#161D28" stroke-width="1.8" stroke-linecap="round"/></svg>',
     };
 
-    let DATA = null, GRID = [], ITEMS = [];
+    let DATA = null, GRID = [], ITEMS = [], REV = null;
     const state = { segment: "All", status: "all", q: "", view: "cards", period: DEFAULT_PERIOD, win: "4-12", thr: THRESHOLD, sort: "change_desc" };
     const charts = new Map();
     let observer = null;
@@ -371,9 +377,13 @@
           segment: state.period === DEFAULT_PERIOD
             ? { borderColor: c => c.p1DataIndex >= pts.length - Number(state.win.split("-")[0]) ? color : color + "66" }
             : {},
-        }] },
+        }, ...(card._item.rev ? [{
+          label: "Revenue", data: card._item.rev.slice(-w), borderColor: "#5AA8F7", borderWidth: 1.6, borderDash: [],
+          fill: false, tension: 0.25, pointRadius: 0, spanGaps: true,
+        }] : [])] },
         options: { responsive: true, maintainAspectRatio: false, animation: false,
-          plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false } },
+          plugins: { legend: { display: false }, tooltip: { mode: "index", intersect: false,
+            callbacks: { label: c => `${c.datasetIndex ? "Revenue" : "Search"}: ${c.formattedValue}` } } },
           scales: { x: { display: false }, y: { display: false, beginAtZero: true, suggestedMax: 100 } } },
       }));
     }
@@ -385,7 +395,8 @@
       const w = PERIODS[state.period].weeks, color = COLORS[s.status];
       charts.set(row, new Chart(canvas.getContext("2d"), {
         type: "line",
-        data: { labels: GRID.slice(-w), datasets: [{ data: series.slice(-w), borderColor: color, borderWidth: 1.4, fill: false, pointRadius: 0, tension: 0.3 }] },
+        data: { labels: GRID.slice(-w), datasets: [{ data: series.slice(-w), borderColor: color, borderWidth: 1.4, fill: false, pointRadius: 0, tension: 0.3 },
+          ...(row._item.rev ? [{ data: row._item.rev.slice(-w), borderColor: "#5AA8F7", borderWidth: 1.2, fill: false, pointRadius: 0, tension: 0.3, spanGaps: true }] : [])] },
         options: { responsive: true, maintainAspectRatio: false, animation: false, events: [],
           plugins: { legend: { display: false }, tooltip: { enabled: false } },
           scales: { x: { display: false }, y: { display: false, beginAtZero: true, suggestedMax: 100 } } },
@@ -400,13 +411,14 @@
     ];
     function keywordTable(list) {
       const wrap = document.createElement("div"); wrap.className = "tbl-wrap";
-      const cols = COLS;
+      const hasRev = list.some(i => i.rev);
+      const cols = hasRev ? [...COLS.slice(0, 6), { key: null, label: "Search↔Rev r" }, COLS[6]] : COLS;
       const head = cols.map(c => {
         const on = c.key && (state.sort === c.key || state.sort === c.alt);
         const arrow = on ? (state.sort === "change_asc" ? " ▲" : state.sort === "az" ? " ▲" : " ▼") : "";
         return `<th data-k="${c.key || ""}" data-alt="${c.alt || ""}" class="${on ? "on" : ""}${c.left ? " left" : ""}">${c.label}${arrow}</th>`;
       }).join("");
-      wrap.innerHTML = `<table><colgroup><col style="width:32%"><col style="width:11%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:18%"></colgroup><thead><tr>${head}</tr></thead><tbody></tbody></table>`;
+      wrap.innerHTML = `<table><colgroup>${hasRev ? '<col style="width:27%"><col style="width:10%"><col style="width:7%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:11%"><col style="width:18%">' : '<col style="width:32%"><col style="width:11%"><col style="width:8%"><col style="width:10%"><col style="width:10%"><col style="width:11%"><col style="width:18%">'}</colgroup><thead><tr>${head}</tr></thead><tbody></tbody></table>`;
       wrap.querySelectorAll("th").forEach(th => {
         const k = th.dataset.k; if (!k) { th.style.cursor = "default"; return; }
         th.onclick = () => { state.sort = state.sort === k && th.dataset.alt ? th.dataset.alt : k; document.getElementById("sort").value = state.sort; update(); };
@@ -420,7 +432,7 @@
         tr.innerHTML = `<td><div class="cell"><div class="thumb">${thumb}</div>${title}</div></td>
           <td class="segc">${esc(segment)}</td><td class="num2">${s.latest}</td>
           <td>${s.recent.toFixed(1)}</td><td>${s.base.toFixed(1)}</td>
-          <td><span class="badge ${s.status}">${fmtChange(s)}</span></td>
+          <td><span class="badge ${s.status}">${fmtChange(s)}</span></td>${hasRev ? `<td>${item.rev ? corrLabel(corrFor(item)) : "—"}</td>` : ""}
           <td class="spark"><div><canvas></canvas></div></td>`;
         tr._item = item;
         tb.appendChild(tr); observe(tr);
@@ -497,15 +509,44 @@
     // ---------- Our top products this year: their Google Trends ----------
     // Game slugs of GameBoost's biggest products per category. Edit these lists to change the section.
     const TOP_PRODUCTS = [
-      { title: "Top GameBoost Accounts This Year", segs: ["Accounts"],
+      { title: "Top GameBoost Accounts This Year", segs: ["Accounts"], revKey: "Accounts",
         games: ["fortnite","valorant","clash-of-clans","grand-theft-auto-v","league-of-legends","brawl-stars","call-of-duty","raid-shadow-legends","pubg-mobile","pokemon-go","rainbow-six-siege","clash-royale","summoners-war","roblox"] },
-      { title: "Top GameBoost Items This Year", segs: ["Items"],
+      { title: "Top GameBoost Items This Year", segs: ["Items"], revKey: "Items",
         games: ["steal-a-brainrot","grow-a-garden-2","call-of-duty","roblox","adopt-me","murder-mystery-2","blox-fruits","arc-raiders","clash-of-clans","fortnite","pubg-mobile","pokemon-go","brawl-stars","donutsmp"] },
-      { title: "Top GameBoost Currencies This Year", segs: ["Currencies", "Top Ups"],
+      { title: "Top GameBoost Currencies This Year", segs: ["Currencies", "Top Ups"], revKey: "Currencies",
         games: ["fortnite","roblox","genshin-impact","valorant","mobile-legends","pokemon-go","wow-classic-era","pubg-mobile","donutsmp","blade-ball","fc-26","honkai-star-rail","old-school-runescape","clash-of-clans"] },
-      { title: "Top GameBoost Gift Cards This Year", segs: ["Gift Cards"],
+      { title: "Top GameBoost Gift Cards This Year", segs: ["Gift Cards"], revKey: "Gift Cards",
         brands: ["PlayStation","Steam","Nintendo","Eneba","Apple","Xbox","Roblox","Valorant","Amazon","Razer","Kinguin","Discord Nitro","iTunes","A-bon"] },
     ];
+    // Indexed weekly revenue (0-100) for a top product, aligned to the Trends week grid
+    function revenueSeries(seg, key) {
+      const src = REV && REV.series && REV.series[seg] && REV.series[seg][key];
+      if (!src) return null;
+      const start = Date.parse(REV.weekStart);
+      const byDate = new Map(src.map((v, i) => [iso(start + i * WEEK), v]));
+      return GRID.map(d => byDate.has(d) ? byDate.get(d) : null);
+    }
+    // Pearson correlation of search vs revenue over the shown period (partial last week left out)
+    function correlation(a, b) {
+      const xs = [], ys = [];
+      for (let i = 0; i < a.length - 1; i++) if (a[i] != null && b[i] != null) { xs.push(a[i]); ys.push(b[i]); }
+      if (xs.length < 6) return null;
+      const mx = xs.reduce((p, c) => p + c, 0) / xs.length, my = ys.reduce((p, c) => p + c, 0) / ys.length;
+      let sxy = 0, sxx = 0, syy = 0;
+      for (let i = 0; i < xs.length; i++) { const dx = xs[i] - mx, dy = ys[i] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+      return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
+    }
+    function corrFor(item) {
+      if (!item.rev) return null;
+      const w = PERIODS[state.period].weeks;
+      return correlation(item.series.slice(-w), item.rev.slice(-w));
+    }
+    function corrLabel(r) {
+      if (r == null) return "";
+      const a = Math.abs(r), word = a >= .6 ? "strong" : a >= .3 ? "moderate" : "weak";
+      return `<span class="corr ${r >= .3 ? "pos" : r <= -.3 ? "neg" : ""}" title="Correlation between search interest and revenue in this period">r ${r >= 0 ? "+" : ""}${r.toFixed(2)} ${word}</span>`;
+    }
+
     function renderTop(content) {
       if (state.q || state.status !== "all") return;
       const groups = TOP_PRODUCTS.filter(g => state.segment === "All" || g.segs.includes(state.segment));
@@ -521,7 +562,7 @@
             .map(i => ({ ...i, s: score(i.series) }))
             // gift cards: prefer the plain "<brand> Gift Card" keyword over sub-products like Game Pass
             .sort((a, b) => (g.brands ? (/gift card/i.test(b.keyword) - /gift card/i.test(a.keyword)) : 0) || b.s.recent - a.s.recent)[0];
-          if (m && !picks.some(p => p.keyword === m.keyword)) picks.push(m);
+          if (m && !picks.some(p => p.keyword === m.keyword)) picks.push({ ...m, rev: revenueSeries(g.revKey, key) });
         }
         if (!picks.length) continue;
         picks.sort(sortFn);
@@ -531,7 +572,12 @@
         content.appendChild(title);
         const grid = document.createElement("div"); grid.className = "grid";
         if (state.view === "table") { content.appendChild(keywordTable(picks)); continue; }
-        for (const i of picks) { const c = keywordCard(i); c.classList.add("top-card"); grid.appendChild(c); observe(c); }
+        for (const i of picks) {
+          const c = keywordCard(i); c.classList.add("top-card");
+          if (i.rev) c.querySelector(".sub").insertAdjacentHTML("afterend",
+            `<div class="legend"><span class="lg s">Search</span><span class="lg r">Revenue (indexed)</span>${corrLabel(corrFor(i))}</div>`);
+          grid.appendChild(c); observe(c);
+        }
         content.appendChild(grid);
       }
     }
@@ -656,6 +702,7 @@
     document.getElementById("meta").innerHTML = "<span>Updated</span> " + esc(new Date(DATA.generatedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }));
     GRID = buildGrid();
     ITEMS = buildItems();
+    try { const r = await fetch("data/revenue.json?t=" + Date.now()); if (r.ok) REV = await r.json(); } catch {}
     readHash(); bindControls(); update();
   } catch (e) {
     document.getElementById("meta").textContent = "";
