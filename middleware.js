@@ -67,7 +67,7 @@ function page(error, status = 401, next = "/") {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#10151E">
-<title>Crack the Market · GameBoost</title>
+<title>Spy the Market · GameBoost</title>
 <link rel="icon" type="image/png" href="__FAV__">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -124,20 +124,20 @@ function page(error, status = 401, next = "/") {
 <main class="vault${wrong ? " shake" : ""}" role="main">
   <img class="logo" src="__LOGO__" alt="GameBoost">
   <div class="lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="10" width="16" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4" fill="currentColor"/></svg></div>
-  <h1>Enter the password to <span class="g">crack the market</span></h1>
+  <h1>Enter the password to <span class="g">spy the market</span></h1>
   <p class="sub">Search demand, sales and SEO signals for everything we sell. Team only.</p>
   ${note}
   <form method="POST" action="/login" id="f" autocomplete="on">
     <input type="hidden" name="next" value="${String(next).replace(/"/g, "&quot;")}">
-    <label for="pw">Access code</label>
+    <label for="pw">Agent code</label>
     <div class="field">
       <input id="pw" name="password" type="password" required autofocus autocomplete="current-password" placeholder="••••••••••••" aria-describedby="err">
       <button class="eye" type="button" id="eye" aria-label="Show password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
-    <button class="go" type="submit" id="go"><span id="gotxt">Crack it</span> →</button>
-    <p class="err" id="err" role="alert">Nope. The market stays locked. Try again.</p>
+    <button class="go" type="submit" id="go"><span id="gotxt">Start spying</span> →</button>
+    <p class="err" id="err" role="alert">Access denied, agent. Try again.</p>
   </form>
-  <div class="foot"><span>GameBoost · Market Trends</span><span>🔒 Encrypted session</span></div>
+  <div class="foot"><span>GameBoost · Market Trends</span><span>🕵️ Team only</span></div>
 </main>
 <div class="ticker" aria-hidden="true"><span>
   FORTNITE ACCOUNTS <b class="u">▲ 12%</b> · ROBUX <b class="d">▼ 4%</b> · V-BUCKS <b class="u">▲ 26%</b> · VALORANT POINTS <b class="u">▲ 3%</b> ·
@@ -147,7 +147,7 @@ function page(error, status = 401, next = "/") {
 <script>
   const f = document.getElementById("f"), pw = document.getElementById("pw"), eye = document.getElementById("eye");
   eye.onclick = () => { const s = pw.type === "password"; pw.type = s ? "text" : "password"; eye.setAttribute("aria-label", s ? "Hide password" : "Show password"); pw.focus(); };
-  f.addEventListener("submit", () => { document.getElementById("gotxt").innerHTML = '<span class="dots">Cracking</span>'; });
+  f.addEventListener("submit", () => { document.getElementById("gotxt").innerHTML = '<span class="dots">Getting you in</span>'; });
   pw.addEventListener("input", () => { document.getElementById("err").style.display = "none"; });
 </script>
 </body></html>`;
