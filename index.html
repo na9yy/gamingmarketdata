@@ -435,6 +435,36 @@
     .home-row .rbx-ic { width: 22px; height: 22px; }
     .home-foot { text-align: center; color: var(--faint); font-size: 11px; margin: 18px 0 0; }
     .home-foot a { color: var(--muted); cursor: pointer; text-decoration: underline; }
+    /* ---------- Trending summary (top of each tab) + related searches ---------- */
+    .sum { background: linear-gradient(180deg, rgba(11,108,251,.09), rgba(11,108,251,.02)); border: 1px solid rgba(90,168,247,.3); border-radius: 12px; padding: 12px 14px; margin-top: 12px; }
+    .sum h2 { margin: 0 0 10px; font-size: 14px; font-weight: 900; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+    .sum h2 .d { color: var(--faint); font-size: 11px; font-weight: 700; }
+    .sum-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    @media (max-width: 1100px) { .sum-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 600px) { .sum-cols { grid-template-columns: 1fr; } }
+    .sum-col { background: rgba(16,21,30,.55); border-radius: 9px; padding: 9px 11px; min-width: 0; }
+    .sum-col h3 { margin: 0 0 4px; font-size: 12px; font-weight: 800; color: var(--muted); }
+    .sum-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; cursor: pointer; min-width: 0; border-top: 1px solid rgba(255,255,255,.04); }
+    .sum-row:first-of-type { border-top: 0; }
+    .sum-row .n { color: var(--faint); font-weight: 800; width: 14px; flex: none; font-size: 11px; }
+    .sum-row .k { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+    .sum-row:hover .k { color: var(--blue-light); }
+    .sum-row .src { color: var(--faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45%; }
+    .sum-empty { color: var(--faint); font-size: 12px; padding: 4px 0; }
+    .brk { display: inline-block; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: rgba(245,184,61,.16); color: var(--new); white-space: nowrap; }
+    .rel { font-size: 11px; color: var(--faint); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rel b { color: var(--muted); font-weight: 700; }
+    .d-related { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 700px) { .d-related { grid-template-columns: 1fr; } }
+    .d-related .box { background: var(--panel-2); border-radius: 9px; padding: 10px 12px; min-width: 0; }
+    .d-related h4 { margin: 0 0 6px; font-size: 12px; font-weight: 800; }
+    .d-related h4 span { color: var(--faint); font-weight: 600; font-size: 11px; }
+    .rq { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; border-top: 1px solid var(--border); }
+    .rq:first-of-type { border-top: 0; }
+    .rq a { flex: 1; min-width: 0; color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rq a:hover { color: var(--blue-light); text-decoration: underline; }
+    .rq .bar { width: 70px; height: 6px; background: var(--panel-3); border-radius: 3px; overflow: hidden; flex: none; }
+    .rq .bar i { display: block; height: 100%; background: var(--blue); }
   </style>
 </head>
 <body>
@@ -652,7 +682,7 @@
           <div class="name">${title}<div class="seg">${esc(segment || "")}</div></div>
           <div class="val"><div class="num">${s.latest}</div><span class="badge ${s.status}">${fmtChange(s)}</span></div>
         </div>
-        <div class="sub">${compareText(s)}</div>
+        <div class="sub">${compareText(s)}</div>${cardRelLine(item)}
         <div class="chart-box"><canvas></canvas></div>`;
       card._item = item;
       card.addEventListener("click", e => { if (!e.target.closest("a")) openDetail(card._item); });
@@ -1010,6 +1040,80 @@
       }
     }
 
+    // ---------- Trending summary + related searches ----------
+    let RELATED = {}; // "Segment|keyword" -> { rising: [[query, value]], top: [[query, value]] }  (Google Trends related queries, last 90 days)
+    const relKey = (seg, kw) => seg + "|" + kw;
+    const fmtRise = v => v >= 5000 ? '<span class="brk">Breakout</span>' : `<span class="up">+${Number(v).toLocaleString("en-US")}%</span>`;
+    const gSearch = q => "https://www.google.com/search?q=" + encodeURIComponent(q);
+
+    function winChg(series, r, b, partial) {
+      const s = partial ? series.slice(0, -1) : series;
+      const R = s.slice(-r), B = s.slice(-(r + b), -r);
+      const nz = a => a.filter(v => v > 0).length;
+      if (R.length < r || B.length < b || nz(R) < Math.ceil(r * .6) || nz(B) < Math.ceil(b * .6)) return null;
+      const rec = avg(R), base = avg(B);
+      if (base < 5 || rec < 5) return null;
+      return { chg: (rec - base) / base * 100, rec, base };
+    }
+    function topMovers(mode, seg, r, b, stepMs) {
+      const m = MODES[mode]; if (!m || !m.ITEMS) return [];
+      const last = m.GRID[m.GRID.length - 1], part = !!last && Date.now() - Date.parse(last) < stepMs;
+      return m.ITEMS.filter(i => seg === "All" || i.segment === seg)
+        .map(i => ({ i, c: winChg(i.series, r, b, part) }))
+        .filter(x => x.c && x.c.chg >= 10).sort((a, b) => b.c.chg - a.c.chg).slice(0, 5);
+    }
+    function hotSearches(seg) {
+      const seen = new Set(), out = [];
+      for (const [k, rel] of Object.entries(RELATED)) {
+        const [s, kw] = [k.slice(0, k.indexOf("|")), k.slice(k.indexOf("|") + 1)];
+        if (seg !== "All" && s !== seg) continue;
+        for (const [q, v] of rel.rising || []) {
+          const key = q.toLowerCase(); if (seen.has(key)) continue; seen.add(key);
+          out.push({ q, v, kw, seg: s });
+        }
+      }
+      return out.sort((a, b) => b.v - a.v).slice(0, 6);
+    }
+
+    function renderSummary(content) {
+      const seg = state.segment, DAY = 864e5, WK = 7 * DAY;
+      const week = MODES.day ? topMovers("day", seg, 7, 7, DAY) : topMovers("week", seg, 1, 4, WK);
+      const month = topMovers("week", seg, 4, 4, WK);
+      const quarter = topMovers("week", seg, 13, 13, WK);
+      const hot = hotSearches(seg);
+      if (!week.length && !month.length && !quarter.length && !hot.length) return;
+      const list = rows => rows.length ? rows.map((x, n) => `<div class="sum-row" data-k="${esc(x.i.keyword)}" data-seg="${esc(x.i.segment)}"><span class="n">${n + 1}</span><span class="k">${esc(x.i.keyword)}</span>${pctTxt(x.c.chg)}</div>`).join("") : '<div class="sum-empty">Nothing clearly rising.</div>';
+      const hotHtml = hot.length ? hot.map(h => `<div class="sum-row" data-k="${esc(h.kw)}" data-seg="${esc(h.seg)}" title="Related search for ${esc(h.kw)}"><span class="k">${esc(h.q)}</span><span class="src">${esc(h.kw)}</span>${fmtRise(h.v)}</div>`).join("")
+        : `<div class="sum-empty">${!Object.keys(RELATED).length ? "Appears after the next Games workflow run." : Object.keys(RELATED).some(k => seg === "All" || k.startsWith(seg + "|")) ? "No rising related searches right now." : "Tracked for Games for now. Open the Games tab."}</div>`;
+      const box = document.createElement("div"); box.className = "sum";
+      box.innerHTML = `<h2>🔥 Trending now${seg === "All" ? "" : " in " + esc(seg)} <span class="d">top risers by Google search interest · auto-updated with each data refresh</span></h2>
+        <div class="sum-cols">
+          <div class="sum-col"><h3>This week <span style="color:var(--faint);font-weight:600">${MODES.day ? "· last 7 days vs 7 before" : "· last week vs 4-week avg"}</span></h3>${list(week)}</div>
+          <div class="sum-col"><h3>This month <span style="color:var(--faint);font-weight:600">· last 4 weeks vs 4 before</span></h3>${list(month)}</div>
+          <div class="sum-col"><h3>Last 3 months <span style="color:var(--faint);font-weight:600">· vs the 3 before</span></h3>${list(quarter)}</div>
+          <div class="sum-col"><h3>Trending searches <span style="color:var(--faint);font-weight:600">· rising related queries</span></h3>${hotHtml}</div>
+        </div>`;
+      box.querySelectorAll(".sum-row[data-k]").forEach(el => el.onclick = () => {
+        const it = ITEMS.find(i => i.keyword === el.dataset.k && i.segment === el.dataset.seg);
+        if (it) openDetail({ ...it, s: score(it.series) });
+      });
+      content.appendChild(box);
+    }
+
+    function relatedHtml(item) {
+      const rel = RELATED[relKey(item.segment, item.keyword)];
+      if (!rel) return "";
+      const rising = (rel.rising || []).slice(0, 8), top = (rel.top || []).slice(0, 8);
+      const tmax = Math.max(1, ...top.map(t => t[1]));
+      return `<div class="box"><h4>🚀 Trending searches <span>· rising in the last 90 days</span></h4>${rising.length ? rising.map(([q, v]) => `<div class="rq"><a href="${gSearch(q)}" target="_blank" rel="noopener">${esc(q)}</a>${fmtRise(v)}</div>`).join("") : '<div class="sum-empty">No rising searches.</div>'}</div>
+        <div class="box"><h4>🔎 Top related searches <span>· most searched with it</span></h4>${top.length ? top.map(([q, v]) => `<div class="rq"><a href="${gSearch(q)}" target="_blank" rel="noopener">${esc(q)}</a><span class="bar"><i style="width:${v / tmax * 100}%"></i></span></div>`).join("") : '<div class="sum-empty">No data.</div>'}</div>`;
+    }
+    function cardRelLine(item) {
+      const rel = RELATED[relKey(item.segment, item.keyword)];
+      const r = rel && (rel.rising || [])[0] ? rel.rising.slice(0, 2).map(x => x[0]) : null;
+      return r ? `<div class="rel" title="Rising related searches">🔥 <b>${r.map(esc).join("</b> · <b>")}</b></div>` : "";
+    }
+
     // ---------- Home: "What would you like to see today?" ----------
     const HOME_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2.5 11h2.8v9h5.2v-6h3v6h5.2v-9h2.8L12 3Z"/></svg>';
     const HOME_DESC = { Accounts: "Game account demand", Currencies: "Gold, coins and in-game money", "Top Ups": "Points, gems and top-ups",
@@ -1197,6 +1301,7 @@
         .map(i => ({ ...i, s: score(i.series) }));
       renderChips(pool);
 
+      if (!q && state.status === "all") renderSummary(content);
       renderTop(content);
       if (content.children.length) content.insertAdjacentHTML("beforeend", '<div class="divider-all">All tracked products</div>');
       const shown = pool.filter(i => state.status === "all" || i.s.status === state.status).sort(sortFn);
@@ -1506,6 +1611,8 @@
       const m = document.getElementById("detail");
       m.hidden = false;
       document.body.style.overflow = "hidden";
+      const relBox = document.getElementById("d-related"), relH = relatedHtml(item);
+      relBox.innerHTML = relH; relBox.hidden = !relH;
       drawDetail();
       document.getElementById("d-close").focus();
     }
@@ -1905,6 +2012,7 @@
     }));
     // daily Trends files are optional: data/accounts-daily.json etc. (last ~90 days)
     const daily = await Promise.all(files.map(async ([name, url]) => [name, await getJSON(url.replace(".json", "-daily.json"))]));
+    for (const [name, d] of daily) for (const it of (d && d.items) || []) if (it.related) RELATED[relKey(name, it.keyword)] = it.related;
     const pack = (res, step) => {
       DATA = { generatedAt: res.map(([, d]) => d && d.generatedAt).filter(Boolean).sort().pop(),
         segments: res.filter(([, d]) => d).map(([name, d]) => ({ name, keywords: d.items || [] })) };
@@ -1955,6 +2063,7 @@
       </div>
       <div class="d-series" id="d-series" role="group" aria-label="Lines on the chart"></div>
       <div class="d-chart"><canvas id="d-canvas"></canvas></div>
+      <div class="d-related" id="d-related" hidden></div>
       <div class="d-foot" id="d-foot"></div>
     </div>
   </div>
