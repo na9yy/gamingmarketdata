@@ -379,6 +379,26 @@
     .rbx-tbl td.mv { font-size: 11px; font-weight: 800; width: 44px; }
     .rbx-tbl td.sp svg { display: block; width: 110px; height: 26px; }
     .rbx-note { color: var(--faint); font-size: 11px; margin: 6px 2px 0; }
+    .rbx-updates { background: linear-gradient(180deg, rgba(11,108,251,.10), rgba(11,108,251,.03)); border: 1px solid rgba(90,168,247,.35); border-radius: 12px; padding: 12px 14px; margin-top: 10px; }
+    .rbx-updates h2 { margin: 0 0 8px; font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 8px; }
+    .rbx-updates h2 .d { color: var(--faint); font-size: 11px; font-weight: 700; }
+    .rbx-upd { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 6px 18px; }
+    .rbx-u { display: flex; gap: 9px; align-items: flex-start; padding: 7px 10px; border-radius: 8px; background: rgba(16,21,30,.55); border-left: 3px solid var(--faint); font-size: 12.5px; line-height: 1.45; }
+    .rbx-u .ic { font-size: 15px; line-height: 1.2; flex: none; }
+    .rbx-u b { color: var(--text); }
+    .rbx-u .m { color: var(--muted); }
+    .rbx-u.lv-hot { border-left-color: var(--new); } .rbx-u.lv-good { border-left-color: var(--up); }
+    .rbx-u.lv-warn { border-left-color: var(--down); } .rbx-u.lv-info { border-left-color: var(--blue-light); }
+    .rbx-charts { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 8px; margin-top: 8px; }
+    @media (max-width: 1250px) { .rbx-charts { grid-template-columns: 1fr; } }
+    .rbx-chart { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; min-width: 0; }
+    .rbx-chart .hd { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+    .rbx-chart h3 { margin: 0; font-size: 13px; font-weight: 800; }
+    .rbx-chart .why { color: var(--faint); font-size: 11px; margin: 2px 0 8px; }
+    .rbx-chart .cv { position: relative; height: 260px; }
+    .rbx-seg { display: flex; gap: 2px; background: var(--panel-2); border-radius: 7px; padding: 2px; margin-left: auto; }
+    .rbx-seg button { background: none; border: 0; color: var(--muted); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; cursor: pointer; }
+    .rbx-seg button.on { background: var(--panel-3); color: #fff; }
   </style>
 </head>
 <body>
@@ -737,17 +757,16 @@
     }
     const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
     // reference row about `days` ago (closest row at least 1 day old, up to `days` back)
-    function rbxRef(h, days) {
+    function rbxRef(h, days, idx = 1) {
       if (!h || h.length < 2) return null;
       const last = h[h.length - 1][0];
-      let ref = null;
-      for (const r of h) { const d = daysBetween(r[0], last); if (d >= 1 && d <= days) { ref = r; break; } }
-      return ref;
+      for (const r of h) { const d = daysBetween(r[0], last); if (d >= 1 && d <= days && r[idx] != null) return r; }
+      return null;
     }
     function rbxStats(id) {
       const g = RBX.games[id]; const h = g.h || []; const cur = h[h.length - 1] || [];
-      const ref = rbxRef(h, 7);
-      const span = ref ? daysBetween(ref[0], cur[0]) : 0;
+      const ref = rbxRef(h, 7, 1), refV = rbxRef(h, 7, 2), refF = rbxRef(h, 7, 3);
+      const span = ref ? daysBetween(ref[0], cur[0]) : 0, spanV = refV ? daysBetween(refV[0], cur[0]) : 0;
       const pct = (a, b) => (b > 0 && a != null) ? (a - b) / b * 100 : null;
       const up = cur[4] || 0, dn = cur[5] || 0;
       const createdDays = g.created ? daysBetween(g.created.slice(0, 10), RBX.date) : null;
@@ -756,10 +775,10 @@
         players: cur[1] || 0, visits: cur[2] || 0, favs: cur[3] || 0,
         likes: up + dn ? up / (up + dn) * 100 : null,
         dPlayers: ref ? pct(cur[1], ref[1]) : null,
-        visitsDay: ref && span ? (cur[2] - ref[2]) / span : null,
-        dFavs: ref ? cur[3] - ref[3] : null,
+        visitsDay: refV && spanV ? (cur[2] - refV[2]) / spanV : null,
+        dFavs: refF ? cur[3] - refF[3] : null,
         rankT: cur[6] || 0, rankP: cur[7] || 0,
-        refRankT: ref ? ref[6] || 0 : null, refRankP: ref ? ref[7] || 0 : null,
+        refRankT: ref ? ref[6] || 0 : null, refRankP: refV ? refV[7] || 0 : null,
         isNewGame: createdDays != null && createdDays <= 30, createdDays,
         slug: rbxGbSlug(g),
       };
@@ -794,7 +813,162 @@
       return rows.map(s => `<div class="rbx-mini">${rbxImg(s.g)}<div class="nm">${rbxLinks(s, "")}</div><div class="v">${valFn(s)}</div></div>`).join("");
     }
 
+    // ---- Roblox: important updates + charts ----
+    const rbxView = { lineSet: "gainers", lineMode: "index" };
+    let rbxCharts = [];
+    const nm = s => `<b>${esc(rbxName(s.g))}</b>`;
+    const joinNames = (arr, fn) => arr.map(fn).join(", ");
+    function rbxRowAt(h, date) { return (h || []).find(r => r[0] === date) || null; }
+
+    function rbxInsights(all, trending, playing) {
+      const U = [];
+      const ref = RBX.refDate;
+      const pulse = RBX.pulse || [];
+      const pNow = pulse.length ? pulse[pulse.length - 1] : null;
+      const pRef = ref ? pulse.find(p => p[0] === ref) : null;
+      const refLbl = ref ? new Date(ref).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "";
+
+      // 1. who's #1
+      const top = trending[0];
+      if (top && ref) {
+        const was = RBX.dropped.find(d => d.was === 1) || (() => { const s = Object.values(all).find(s => { const r = rbxRowAt(s.g.h, ref); return r && r[6] === 1; }); return s ? { name: rbxName(s.g), id: s.id } : null; })();
+        if (was && was.id !== top.id) U.push({ lv: "hot", ic: "👑", h: `New #1 on Top Trending: ${nm(top)} <span class="m">(${rbxN(top.players)} playing). A week ago #1 was <b>${esc(was.name || "another game")}</b>.</span>` });
+        else U.push({ lv: "info", ic: "👑", h: `${nm(top)} holds #1 on Top Trending <span class="m">(${rbxN(top.players)} playing).</span>` });
+      }
+      // 2. market pulse
+      if (pNow && pRef && pNow[1] != null && pRef[1]) {
+        const ch = (pNow[1] - pRef[1]) / pRef[1] * 100;
+        const big = RBX.dropped.slice().sort((a, b) => b.players - a.players)[0];
+        const why = ch < -15 && big && big.players > pRef[1] * 0.2 ? ` Mostly because <b>${esc(big.name || "a big game")}</b> (${rbxN(big.players)} players) left the Trending chart.` : "";
+        U.push({ lv: ch >= 10 ? "good" : ch <= -10 ? "warn" : "info", ic: "📊",
+          h: `Players across the Top Trending 50: <b>${rbxN(pNow[1])}</b>, ${pctTxt(ch)} vs ${refLbl}.<span class="m">${why}</span>` });
+      }
+      // 2b. weekly rhythm (weekend vs weekday) from the pulse history
+      const pp = pulse.filter(p => p[1] != null);
+      if (pp.length >= 14) {
+        const wkd = [], wke = [];
+        pp.forEach(p => { const d = new Date(p[0]).getDay(); (d === 0 || d === 6 ? wke : wkd).push(p[1]); });
+        const av = a => a.reduce((x, y) => x + y, 0) / a.length;
+        if (wke.length && wkd.length) {
+          const diff = (av(wke) - av(wkd)) / av(wkd) * 100;
+          if (Math.abs(diff) >= 15) U.push({ lv: "info", ic: "📅", h: `Weekly rhythm: trending games get <b>${diff > 0 ? "+" : ""}${Math.round(diff)}%</b> more players on weekends than weekdays. <span class="m">Compare same weekdays before calling a trend.</span>` });
+        }
+      }
+      // 3. breakouts
+      const brk = Object.values(all).filter(s => s.dPlayers != null && s.dPlayers >= 50 && s.players >= 5000).sort((a, b) => b.dPlayers - a.dPlayers).slice(0, 4);
+      if (brk.length) U.push({ lv: "hot", ic: "🚀", h: `Breaking out (players up 50%+ in 7 days): ${joinNames(brk, s => `${nm(s)} ${pctTxt(s.dPlayers)}`)}` });
+      // 4. new on trending this week
+      if (ref) {
+        const fresh = trending.filter(s => { const r = rbxRowAt(s.g.h, ref); return !r || !r[6]; }).sort((a, b) => b.players - a.players);
+        if (fresh.length) U.push({ lv: "info", ic: "🆕", h: `<b>${fresh.length}</b> games entered the Top Trending 50 since ${refLbl}. Biggest: ${joinNames(fresh.slice(0, 4), s => `${nm(s)} <span class="m">(${rbxN(s.players)})</span>`)}` });
+      }
+      // 5. dropped out
+      const gone = (RBX.dropped || []).filter(d => d.name);
+      if ((RBX.dropped || []).length) U.push({ lv: "warn", ic: "📉", h: `<b>${RBX.dropped.length}${RBX.dropped.length >= 15 ? "+" : ""}</b> games left the Top Trending 50 since ${refLbl}${gone.length ? ": " + gone.slice(0, 5).map(d => `<b>${esc(d.name)}</b> <span class="m">(was #${d.was})</span>`).join(", ") : "."}` });
+      // 6. games we sell
+      const ours = Object.values(all).filter(s => s.slug && s.dPlayers != null && s.players >= 2000);
+      const oursUp = ours.filter(s => s.dPlayers >= 20).sort((a, b) => b.dPlayers - a.dPlayers).slice(0, 4);
+      const oursDn = ours.filter(s => s.dPlayers <= -25).sort((a, b) => a.dPlayers - b.dPlayers).slice(0, 4);
+      if (oursUp.length) U.push({ lv: "good", ic: "💰", h: `Games we sell that are growing: ${joinNames(oursUp, s => `${nm(s)} ${pctTxt(s.dPlayers)}`)} <span class="m">Push stock and content here.</span>` });
+      if (oursDn.length) U.push({ lv: "warn", ic: "⚠️", h: `Games we sell that are cooling down: ${joinNames(oursDn, s => `${nm(s)} ${pctTxt(s.dPlayers)}`)}` });
+      // 7. opportunities
+      const opp = trending.filter(s => !s.slug && s.players >= 10000 && (s.dPlayers == null || s.dPlayers >= 0)).sort((a, b) => b.players - a.players).slice(0, 4);
+      if (opp.length) U.push({ lv: "hot", ic: "🎯", h: `Trending with 10K+ players and not on GameBoost: ${joinNames(opp, s => `${nm(s)} <span class="m">(${rbxN(s.players)})</span>`)}` });
+      // 8. launch wave + genre
+      const newN = trending.filter(s => s.isNewGame).length;
+      if (trending.length) {
+        const gc = {}; trending.forEach(s => { const k = s.g.genre || "Other"; gc[k] = (gc[k] || 0) + 1; });
+        const [tg, tc] = Object.entries(gc).sort((a, b) => b[1] - a[1])[0];
+        U.push({ lv: newN / trending.length >= 0.3 ? "hot" : "info", ic: "🧩",
+          h: `<b>${newN}</b> of the top ${trending.length} trending games launched in the last 30 days${newN / trending.length >= 0.3 ? " (a new-game wave)" : ""}. <b>${esc(tg)}</b> leads the chart with ${tc} games (${Math.round(tc / trending.length * 100)}%).` });
+      }
+      // 9. concentration in Playing Now
+      if (playing.length > 1) {
+        const tot = playing.reduce((a, s) => a + s.players, 0), p1 = playing[0];
+        const sh = p1.players / tot * 100;
+        if (sh >= 20) U.push({ lv: "info", ic: "🧲", h: `${nm(p1)} has <b>${Math.round(sh)}%</b> of all players in the Top Playing 50 <span class="m">(${rbxN(p1.players)} of ${rbxN(tot)}), ${(p1.players / playing[1].players).toFixed(1)}x the #2 game.</span>` });
+      }
+      return U;
+    }
+
+    function rbxLineSets(all, trending) {
+      const withHist = s => (s.g.h || []).length >= 3;
+      return {
+        gainers: Object.values(all).filter(s => withHist(s) && s.dPlayers != null && s.players >= 5000).sort((a, b) => b.dPlayers - a.dPlayers).slice(0, 6),
+        trending: trending.filter(withHist).slice(0, 6),
+        ours: Object.values(all).filter(s => withHist(s) && s.slug).sort((a, b) => b.players - a.players).slice(0, 6),
+      };
+    }
+
+    const RBX_COLORS = ["#5AA8F7", "#3DDC84", "#F5B83D", "#F2555A", "#B98CFF", "#2ED3C9"];
+    const kfmt = v => v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : v >= 1e3 ? Math.round(v / 1e3) + "K" : v;
+    const baseOpts = extra => Object.assign({ responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { labels: { color: "#9AA6B8", boxWidth: 10, boxHeight: 10, font: { size: 11 } } } } }, extra);
+    const axis = (extra = {}) => Object.assign({ grid: { color: "rgba(255,255,255,.05)" }, ticks: { color: "#637085", font: { size: 10 } } }, extra);
+    const dlbl = d => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+    function renderRbxCharts(content, all, trending) {
+      rbxCharts.forEach(c => c.destroy()); rbxCharts = [];
+      if (typeof Chart === "undefined") return;
+      const pulse = (RBX.pulse || []).slice(-30);
+      const sets = rbxLineSets(all, trending);
+      const box = document.createElement("div"); box.className = "rbx-charts";
+      box.innerHTML = `
+        <div class="rbx-chart"><h3>📊 Market pulse</h3><div class="why">Total players across each top 50 chart, per day. Rising line = more players flowing into trending games.</div><div class="cv"><canvas id="rbx-c1"></canvas></div></div>
+        <div class="rbx-chart"><div class="hd"><div><h3>📈 Players over time</h3><div class="why">${rbxView.lineMode === "index" ? "Index: first day = 100, so games of any size compare" : "Players online at ~06:30 each day"}</div></div>
+          <div class="rbx-seg" id="rbx-set"><button data-v="gainers">Top gainers</button><button data-v="trending">Top trending</button><button data-v="ours">We sell</button></div>
+          <div class="rbx-seg" id="rbx-mode"><button data-v="index">Index</button><button data-v="raw">Players</button></div></div>
+          <div class="cv"><canvas id="rbx-c2"></canvas></div></div>
+        <div class="rbx-chart"><h3>🧭 Momentum map</h3><div class="why">Size (players now) vs growth (7 days). Top-right = big and growing. Blue = we sell it, orange = we don't.</div><div class="cv"><canvas id="rbx-c3"></canvas></div></div>`;
+      content.appendChild(box);
+      box.querySelectorAll("#rbx-set button").forEach(b => { b.classList.toggle("on", b.dataset.v === rbxView.lineSet); b.onclick = () => { rbxView.lineSet = b.dataset.v; render(); }; });
+      box.querySelectorAll("#rbx-mode button").forEach(b => { b.classList.toggle("on", b.dataset.v === rbxView.lineMode); b.onclick = () => { rbxView.lineMode = b.dataset.v; render(); }; });
+
+      // 1. market pulse
+      rbxCharts.push(new Chart(document.getElementById("rbx-c1"), { type: "line",
+        data: { labels: pulse.map(p => dlbl(p[0])), datasets: [
+          { label: "Top Trending 50", data: pulse.map(p => p[1]), borderColor: "#F5B83D", backgroundColor: "#F5B83D22", fill: true, tension: .3, pointRadius: 0, borderWidth: 2, spanGaps: true },
+          { label: "Top Playing Now 50", data: pulse.map(p => p[2]), borderColor: "#5AA8F7", tension: .3, pointRadius: 3, borderWidth: 2, spanGaps: true },
+        ] },
+        options: baseOpts({ scales: { x: axis({ ticks: { color: "#637085", font: { size: 10 }, maxTicksLimit: 8 } }), y: axis({ beginAtZero: true, ticks: { color: "#637085", font: { size: 10 }, callback: kfmt } }) },
+          plugins: { legend: { labels: { color: "#9AA6B8", boxWidth: 10, font: { size: 11 } } }, tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.raw == null ? "not tracked yet" : rbxN(c.raw)}` } } } }) }));
+
+      // 2. players over time
+      const games = sets[rbxView.lineSet] || [];
+      const dates = [...new Set(games.flatMap(s => s.g.h.map(r => r[0])))].sort().slice(-30);
+      const ds = games.map((s, i) => {
+        const m = new Map(s.g.h.map(r => [r[0], r[1]]));
+        const raw = dates.map(d => m.has(d) ? m.get(d) : null);
+        const first = raw.find(v => v != null && v > 0);
+        const data = rbxView.lineMode === "index" ? raw.map(v => v == null || !first ? null : Math.round(v / first * 100)) : raw;
+        return { label: rbxName(s.g), data, raw, borderColor: RBX_COLORS[i], backgroundColor: RBX_COLORS[i], tension: .3, pointRadius: 0, borderWidth: 2, spanGaps: true };
+      });
+      const c2 = document.getElementById("rbx-c2");
+      if (!games.length) c2.parentElement.innerHTML = '<div class="rbx-empty">Needs a few days of history for this set.</div>';
+      else rbxCharts.push(new Chart(c2, { type: "line", data: { labels: dates.map(dlbl), datasets: ds },
+        options: baseOpts({ scales: { x: axis({ ticks: { color: "#637085", font: { size: 10 }, maxTicksLimit: 8 } }),
+          y: axis({ ticks: { color: "#637085", font: { size: 10 }, callback: v => rbxView.lineMode === "index" ? v : kfmt(v) } }) },
+          plugins: { legend: { position: "bottom", labels: { color: "#9AA6B8", boxWidth: 10, font: { size: 11 } } },
+            tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${c.dataset.raw[c.dataIndex] == null ? "not on charts" : rbxN(c.dataset.raw[c.dataIndex])}${rbxView.lineMode === "index" && c.raw != null ? ` (index ${c.raw})` : ""}` } } } }) }));
+
+      // 3. momentum map
+      const pts = Object.values(all).filter(s => s.dPlayers != null && s.players > 0);
+      const c3 = document.getElementById("rbx-c3");
+      if (!pts.length) c3.parentElement.innerHTML = '<div class="rbx-empty">Needs 2+ days of history.</div>';
+      else {
+        const mk = (arr, label, col) => ({ label, data: arr.map(s => ({ x: s.players, y: Math.max(-100, Math.min(300, Math.round(s.dPlayers))), s })), backgroundColor: col + "CC", borderColor: col, pointRadius: 5, pointHoverRadius: 7 });
+        rbxCharts.push(new Chart(c3, { type: "scatter", data: { datasets: [mk(pts.filter(s => s.slug), "We sell", "#5AA8F7"), mk(pts.filter(s => !s.slug), "Not on GameBoost", "#F5B83D")] },
+          options: baseOpts({ interaction: { mode: "nearest", intersect: true },
+            scales: { x: axis({ type: "logarithmic", title: { display: true, text: "Players now (log)", color: "#637085", font: { size: 10 } }, ticks: { color: "#637085", font: { size: 10 }, callback: v => [1e3, 1e4, 1e5, 1e6].includes(v) ? kfmt(v) : "" } }),
+              y: axis({ title: { display: true, text: "Players 7d %", color: "#637085", font: { size: 10 } }, ticks: { color: "#637085", font: { size: 10 }, callback: v => v + "%" } }) },
+            plugins: { legend: { position: "bottom", labels: { color: "#9AA6B8", boxWidth: 10, font: { size: 11 } } },
+              tooltip: { callbacks: { label: c => ` ${rbxName(c.raw.s.g)}: ${rbxN(c.raw.s.players)} playing, ${c.raw.s.dPlayers > 0 ? "+" : ""}${Math.round(c.raw.s.dPlayers)}%` } } } }) }));
+      }
+    }
+
     function renderRoblox(content) {
+      if (RBX && !RBX.dropped) RBX.dropped = [];
       if (!RBX || !RBX.games) { content.innerHTML = '<div class="empty">No Roblox data yet. Run the "Roblox Games → Vercel" workflow in n8n.</div>'; return; }
       const q = normName(state.q.trim());
       const all = {};
@@ -812,6 +986,11 @@
           <button data-l="trending" class="${rbxState.list === "trending" ? "on" : ""}">Top Trending</button>
           <button data-l="playing" class="${rbxState.list === "playing" ? "on" : ""}">Top Playing Now</button></div></div>`);
       content.querySelectorAll(".rbx-list-toggle button").forEach(b => b.onclick = () => { rbxState.list = b.dataset.l; render(); });
+
+      // ---- important updates + charts ----
+      const upd = rbxInsights(all, trending, playing);
+      if (upd.length) content.insertAdjacentHTML("beforeend", `<div class="rbx-updates"><h2>⚡ Important updates <span class="d">${esc(RBX.refDate ? "vs " + dlbl(RBX.refDate) : "")} · auto-generated from today's charts</span></h2><div class="rbx-upd">${upd.map(u => `<div class="rbx-u lv-${u.lv}"><span class="ic">${u.ic}</span><div>${u.h}</div></div>`).join("")}</div></div>`);
+      renderRbxCharts(content, all, trending);
 
       // ---- overview ----
       const union = Object.values(all);
