@@ -334,6 +334,51 @@
       .grid { grid-template-columns: minmax(0, 1fr); }
       .info .tip { right: -8px; width: 260px; }
     }
+
+    /* ---------- Roblox tab ---------- */
+    body.rbx #gran, body.rbx #periods, body.rbx #sort, body.rbx #cmpbtn, body.rbx #gsctoggle, body.rbx #revtoggle,
+    body.rbx .views, body.rbx .info, body.rbx #chips { display: none !important; }
+    .rbx-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 14px 0 4px; color: var(--faint); font-size: 12px; }
+    .rbx-head b { color: var(--muted); }
+    .rbx-list-toggle { display: flex; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 2px; margin-left: auto; }
+    .rbx-list-toggle button { background: none; border: 0; color: var(--muted); font-weight: 700; font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+    .rbx-list-toggle button.on { background: var(--blue); color: #fff; }
+    .rbx-over { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 8px; margin-top: 8px; }
+    .rbx-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 12px 8px; min-width: 0; }
+    .rbx-panel h3 { margin: 0 0 2px; font-size: 13px; font-weight: 800; }
+    .rbx-panel .why { color: var(--faint); font-size: 11px; margin-bottom: 8px; }
+    .rbx-mini { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid var(--border); min-width: 0; }
+    .rbx-mini:first-of-type { border-top: 0; }
+    .rbx-mini .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 12.5px; }
+    .rbx-mini .nm a { color: inherit; text-decoration: none; } .rbx-mini .nm a:hover { text-decoration: underline; }
+    .rbx-mini .v { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 12px; white-space: nowrap; }
+    .rbx-ic { width: 26px; height: 26px; border-radius: 6px; flex: none; background: var(--panel-2); object-fit: cover; }
+    .rbx-bar { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+    .rbx-bar .lbl { width: 130px; flex: none; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rbx-bar .track { flex: 1; height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+    .rbx-bar .fill { height: 100%; background: var(--blue); border-radius: 4px; }
+    .rbx-bar .c { width: 24px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .rbx-empty { color: var(--faint); font-size: 12px; padding: 8px 0; }
+    .up { color: var(--up); } .down { color: var(--down); } .flat { color: var(--faint); }
+    .gb { display: inline-block; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: rgba(11,108,251,.16); color: var(--blue-light); text-decoration: none; margin-left: 6px; vertical-align: 1px; }
+    .gb:hover { background: var(--blue); color: #fff; }
+    .newtag { display: inline-block; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 4px; background: rgba(245,184,61,.14); color: var(--new); margin-left: 6px; vertical-align: 1px; }
+    .rbx-tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+    .rbx-tbl { width: 100%; min-width: 980px; table-layout: auto; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+    .rbx-tbl th, .rbx-tbl td { padding: 6px 10px; }
+    .rbx-tbl th { cursor: default; }
+    .rbx-tbl th.sortable { cursor: pointer; }
+    .rbx-tbl tbody tr { cursor: default; }
+    .rbx-tbl td.game { text-align: left; max-width: 340px; }
+    .rbx-tbl td.game .cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .rbx-tbl td.game .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .rbx-tbl td.game a.t { color: var(--text); font-weight: 700; text-decoration: none; }
+    .rbx-tbl td.game a.t:hover { text-decoration: underline; }
+    .rbx-tbl td.genre { text-align: left; color: var(--faint); }
+    .rbx-tbl td.rk { color: var(--muted); font-weight: 800; width: 34px; }
+    .rbx-tbl td.mv { font-size: 11px; font-weight: 800; width: 44px; }
+    .rbx-tbl td.sp svg { display: block; width: 110px; height: 26px; }
+    .rbx-note { color: var(--faint); font-size: 11px; margin: 6px 2px 0; }
   </style>
 </head>
 <body>
@@ -672,11 +717,174 @@
       }
     }
 
+
+    // ---------- Roblox tab (data/roblox.json, written by the "Roblox Games → Vercel" n8n workflow) ----------
+    // h rows: [date, players, visits, favorites, upVotes, downVotes, trendingRank, playingRank]
+    let RBX = null;
+    const RBX_ALIAS = { "rivals": "roblox-rivals" }; // Roblox name -> gameboost.com slug when names differ
+    const rbxState = { list: "both", sort: {} };
+    const RBX_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.1 2 22 6.1 17.9 22 2 17.9 6.1 2Zm4.3 7.5-.9 3.6 3.6.9.9-3.6-3.6-.9Z" fill-rule="evenodd"/></svg>';
+    const rbxN = n => n == null ? "—" : n >= 1e9 ? (n / 1e9).toFixed(1) + "B" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e4 ? Math.round(n / 1e3) + "K" : Number(n).toLocaleString("en-US");
+    const rbxName = g => String(g.name || g.raw || "").split(/\s*[|｜]\s*/)[0].trim() || g.raw;
+    function rbxGbSlug(g) {
+      const w = normName(rbxName(g)).split(" ").filter(Boolean);
+      if (RBX_ALIAS[w.join(" ")]) return RBX_ALIAS[w.join(" ")];
+      for (let n = w.length; n > 0; n--) {
+        const k = w.slice(0, n).join(" ");
+        if (k !== "roblox" && GAMES[k] && (n >= 2 || w.length === 1)) return GAMES[k];
+      }
+      return null;
+    }
+    const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+    // reference row about `days` ago (closest row at least 1 day old, up to `days` back)
+    function rbxRef(h, days) {
+      if (!h || h.length < 2) return null;
+      const last = h[h.length - 1][0];
+      let ref = null;
+      for (const r of h) { const d = daysBetween(r[0], last); if (d >= 1 && d <= days) { ref = r; break; } }
+      return ref;
+    }
+    function rbxStats(id) {
+      const g = RBX.games[id]; const h = g.h || []; const cur = h[h.length - 1] || [];
+      const ref = rbxRef(h, 7);
+      const span = ref ? daysBetween(ref[0], cur[0]) : 0;
+      const pct = (a, b) => (b > 0 && a != null) ? (a - b) / b * 100 : null;
+      const up = cur[4] || 0, dn = cur[5] || 0;
+      const createdDays = g.created ? daysBetween(g.created.slice(0, 10), RBX.date) : null;
+      return {
+        id, g, cur, ref, span,
+        players: cur[1] || 0, visits: cur[2] || 0, favs: cur[3] || 0,
+        likes: up + dn ? up / (up + dn) * 100 : null,
+        dPlayers: ref ? pct(cur[1], ref[1]) : null,
+        visitsDay: ref && span ? (cur[2] - ref[2]) / span : null,
+        dFavs: ref ? cur[3] - ref[3] : null,
+        rankT: cur[6] || 0, rankP: cur[7] || 0,
+        refRankT: ref ? ref[6] || 0 : null, refRankP: ref ? ref[7] || 0 : null,
+        isNewGame: createdDays != null && createdDays <= 30, createdDays,
+        slug: rbxGbSlug(g),
+      };
+    }
+    function rbxSpark(h) {
+      const pts = (h || []).slice(-30).map(r => r[1] || 0);
+      if (pts.length < 2) return '<span class="flat">—</span>';
+      const max = Math.max(...pts), min = Math.min(...pts), W = 110, H = 26, rng = max - min || 1;
+      const d = pts.map((v, i) => (i ? "L" : "M") + (i / (pts.length - 1) * (W - 2) + 1).toFixed(1) + "," + (H - 2 - (v - min) / rng * (H - 4)).toFixed(1)).join("");
+      const col = pts[pts.length - 1] >= pts[0] ? "var(--up)" : "var(--down)";
+      return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><path d="${d}" fill="none" stroke="${col}" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
+    }
+    const pctTxt = v => v == null ? '<span class="flat">—</span>' : `<span class="${v >= 0.5 ? "up" : v <= -0.5 ? "down" : "flat"}">${v > 0 ? "+" : ""}${Math.round(v)}%</span>`;
+    function moveTxt(now, was) {
+      if (was == null) return '<span class="flat">—</span>';
+      if (!was) return '<span class="newtag" style="margin:0">NEW</span>';
+      const d = was - now;
+      return d > 0 ? `<span class="up">▲${d}</span>` : d < 0 ? `<span class="down">▼${-d}</span>` : '<span class="flat">•</span>';
+    }
+    function rbxLinks(s, cls) {
+      const g = s.g, nm = esc(rbxName(g));
+      const url = g.place ? `https://www.roblox.com/games/${g.place}` : null;
+      const main = url ? `<a class="${cls}" href="${url}" target="_blank" rel="noopener" title="${esc(g.raw)}">${nm}</a>` : `<span class="${cls}" title="${esc(g.raw)}">${nm}</span>`;
+      const gb = s.slug ? `<a class="gb" href="https://gameboost.com/${s.slug}" target="_blank" rel="noopener" title="We sell this on GameBoost">GB</a>` : "";
+      const nw = s.isNewGame ? `<span class="newtag" title="Launched ${s.createdDays} days ago">NEW GAME</span>` : "";
+      return main + gb + nw;
+    }
+    const rbxImg = g => g.icon ? `<img class="rbx-ic" src="${esc(g.icon)}" alt="" loading="lazy">` : '<span class="rbx-ic"></span>';
+
+    function rbxMiniList(rows, valFn) {
+      if (!rows.length) return '<div class="rbx-empty">Nothing here yet.</div>';
+      return rows.map(s => `<div class="rbx-mini">${rbxImg(s.g)}<div class="nm">${rbxLinks(s, "")}</div><div class="v">${valFn(s)}</div></div>`).join("");
+    }
+
+    function renderRoblox(content) {
+      if (!RBX || !RBX.games) { content.innerHTML = '<div class="empty">No Roblox data yet. Run the "Roblox Games → Vercel" workflow in n8n.</div>'; return; }
+      const q = normName(state.q.trim());
+      const all = {};
+      for (const id of Object.keys(RBX.games)) all[id] = rbxStats(id);
+      const match = s => !q || normName(rbxName(s.g)).includes(q) || normName(s.g.genre || "").includes(q);
+      const trending = RBX.lists.trending.map(id => all[id]).filter(Boolean);
+      const playing = RBX.lists.playing.map(id => all[id]).filter(Boolean);
+      const days = new Set(); Object.values(RBX.games).forEach(g => (g.h || []).forEach(r => days.add(r[0])));
+      const hasHist = days.size >= 2;
+
+      content.insertAdjacentHTML("beforeend", `<div class="rbx-head"><span>Roblox charts · updated <b>${esc(RBX.date || "")}</b> · <b>${days.size}</b> day${days.size === 1 ? "" : "s"} of history</span>
+        <span>Changes compare against ~7 days ago${hasHist ? "" : " (starts filling in from tomorrow)"}.</span>
+        <div class="rbx-list-toggle" role="group" aria-label="Lists">
+          <button data-l="both" class="${rbxState.list === "both" ? "on" : ""}">Both</button>
+          <button data-l="trending" class="${rbxState.list === "trending" ? "on" : ""}">Top Trending</button>
+          <button data-l="playing" class="${rbxState.list === "playing" ? "on" : ""}">Top Playing Now</button></div></div>`);
+      content.querySelectorAll(".rbx-list-toggle button").forEach(b => b.onclick = () => { rbxState.list = b.dataset.l; render(); });
+
+      // ---- overview ----
+      const union = Object.values(all);
+      const gainers = union.filter(s => s.dPlayers != null && s.players >= 2000).sort((a, b) => b.dPlayers - a.dPlayers).slice(0, 6);
+      const newGames = union.filter(s => s.isNewGame).sort((a, b) => b.players - a.players).slice(0, 6);
+      const opp = trending.filter(s => !s.slug).slice(0, 6);
+      const genres = {}; trending.forEach(s => { const k = s.g.genre || "Other"; genres[k] = (genres[k] || 0) + 1; });
+      const gl = Object.entries(genres).sort((a, b) => b[1] - a[1]).slice(0, 8), gmax = gl.length ? gl[0][1] : 1;
+      const sold = trending.filter(s => s.slug).length;
+      content.insertAdjacentHTML("beforeend", `<div class="rbx-over">
+        <div class="rbx-panel"><h3>🔥 Hottest right now</h3><div class="why">Top of Roblox's Trending chart (biggest weekly growth in daily players)</div>
+          ${rbxMiniList(trending.slice(0, 6), s => rbxN(s.players) + " playing")}</div>
+        <div class="rbx-panel">${hasHist
+          ? `<h3>📈 Biggest player gains</h3><div class="why">Concurrent players now vs ~7 days ago, games with 2K+ players</div>${rbxMiniList(gainers, s => pctTxt(s.dPlayers))}`
+          : `<h3>🆕 New games on the charts</h3><div class="why">Launched in the last 30 days. Player-gain ranking appears after 2 daily runs.</div>${rbxMiniList(newGames, s => rbxN(s.players) + " playing")}`}</div>
+        <div class="rbx-panel"><h3>🎯 Trending, not on GameBoost</h3><div class="why">We sell <b>${sold}</b> of the top ${trending.length} trending games. Top ones we don't:</div>
+          ${rbxMiniList(opp, s => rbxN(s.players) + " playing")}</div>
+        <div class="rbx-panel"><h3>🧩 Genres in Top Trending</h3><div class="why">Which kinds of games are growing now</div>
+          ${gl.map(([k, c]) => `<div class="rbx-bar"><span class="lbl">${esc(k)}</span><span class="track"><span class="fill" style="display:block;width:${c / gmax * 100}%"></span></span><span class="c">${c}</span></div>`).join("")}</div>
+      </div>`);
+
+      // ---- tables ----
+      const cols = [
+        { k: "rank", t: "#", v: (s, which) => which === "trending" ? s.rankT : s.rankP },
+        { k: "move", t: "Move", v: null },
+        { k: "name", t: "Game", v: s => rbxName(s.g).toLowerCase(), left: true },
+        { k: "genre", t: "Genre", v: s => s.g.genre || "", left: true },
+        { k: "players", t: "Playing now", v: s => s.players },
+        { k: "dPlayers", t: "Players 7d", v: s => s.dPlayers ?? -Infinity },
+        { k: "visits", t: "Visits", v: s => s.visits },
+        { k: "visitsDay", t: "Visits / day", v: s => s.visitsDay ?? -Infinity },
+        { k: "favs", t: "Favorites", v: s => s.favs },
+        { k: "dFavs", t: "Favs 7d", v: s => s.dFavs ?? -Infinity },
+        { k: "likes", t: "Likes", v: s => s.likes ?? -1 },
+        { k: "spark", t: "Players 30d", v: null },
+      ];
+      const table = (title, which, rows) => {
+        const st = rbxState.sort[which] || { k: "rank", dir: 1 };
+        const col = cols.find(c => c.k === st.k);
+        const list = rows.filter(match).slice().sort((a, b) => { const x = col.v(a, which), y = col.v(b, which); return (x > y ? 1 : x < y ? -1 : 0) * st.dir; });
+        const sec = document.createElement("div");
+        sec.innerHTML = `<div class="section-title">${title}<span class="n">${list.length}</span></div>`;
+        const wrap = document.createElement("div"); wrap.className = "rbx-tbl-wrap";
+        wrap.innerHTML = `<table class="rbx-tbl"><thead><tr>${cols.map(c => `<th class="${c.left ? "left" : ""} ${c.v ? "sortable" : ""} ${st.k === c.k ? "on" : ""}" data-k="${c.k}">${c.t}${st.k === c.k ? (st.dir > 0 ? " ↑" : " ↓") : ""}</th>`).join("")}</tr></thead><tbody>${
+          list.map(s => {
+            const rk = which === "trending" ? s.rankT : s.rankP, was = which === "trending" ? s.refRankT : s.refRankP;
+            return `<tr><td class="rk">${rk}</td><td class="mv">${moveTxt(rk, was)}</td>
+              <td class="game"><div class="cell">${rbxImg(s.g)}<span class="t">${rbxLinks(s, "t")}</span></div></td>
+              <td class="genre">${esc(s.g.genre || "—")}</td><td><b>${rbxN(s.players)}</b></td><td>${pctTxt(s.dPlayers)}</td>
+              <td>${rbxN(s.visits)}</td><td>${s.visitsDay == null ? '<span class="flat">—</span>' : rbxN(Math.round(s.visitsDay))}</td>
+              <td>${rbxN(s.favs)}</td><td>${s.dFavs == null ? '<span class="flat">—</span>' : (s.dFavs >= 0 ? "+" : "") + rbxN(s.dFavs)}</td>
+              <td>${s.likes == null ? "—" : Math.round(s.likes) + "%"}</td><td class="sp">${rbxSpark(s.g.h)}</td></tr>`;
+          }).join("") || `<tr><td colspan="${cols.length}" style="text-align:center;color:var(--faint)">No games match.</td></tr>`}</tbody></table>`;
+        wrap.querySelectorAll("th.sortable").forEach(th => th.onclick = () => {
+          const k = th.dataset.k, cur = rbxState.sort[which] || { k: "rank", dir: 1 };
+          const numeric = !["name", "genre", "rank"].includes(k);
+          rbxState.sort[which] = cur.k === k ? { k, dir: -cur.dir } : { k, dir: numeric ? -1 : 1 };
+          render();
+        });
+        sec.appendChild(wrap);
+        content.appendChild(sec);
+      };
+      if (rbxState.list !== "playing") table("Top Trending", "trending", trending);
+      if (rbxState.list !== "trending") table("Top Playing Now", "playing", playing);
+      content.insertAdjacentHTML("beforeend", `<p class="rbx-note">Source: Roblox public charts (Top Trending = biggest weekly growth in daily active users, Top Playing Now = concurrent players). Playing now is a snapshot at ~06:30 Zagreb time each day. GB = we sell it on GameBoost. Roblox has no public search-volume data.</p>`);
+    }
+
     const expanded = new Set(); // sections where "Show more" is open
     function render() {
       destroyCharts();
       const content = document.getElementById("content");
       content.innerHTML = "";
+      if (state.segment === "Roblox") { document.getElementById("chips").innerHTML = ""; renderRoblox(content); return; }
       if (!DATA || !DATA.segments || !DATA.segments.length || !GRID.length) {
         content.innerHTML = '<div class="empty">No trend data yet. The daily workflow will populate this.</div>';
         document.getElementById("chips").innerHTML = "";
@@ -1239,12 +1447,12 @@
     function renderTabs() {
       const tabs = document.getElementById("tabs");
       tabs.innerHTML = "";
-      const names = ["All", ...DATA.segments.map(s => s.name)];
+      const names = ["All", ...DATA.segments.map(s => s.name), ...(RBX ? ["Roblox"] : [])];
       if (names.length <= 2) return; // only one segment, tabs add nothing
       for (const name of names) {
         const b = document.createElement("button");
         b.className = "tab" + (name === state.segment ? " active" : "");
-        b.innerHTML = `<span class="ic">${SEG_ICON[name] || ""}</span>${esc(name)}`;
+        b.innerHTML = `<span class="ic">${name === "Roblox" ? RBX_ICON : SEG_ICON[name] || ""}</span>${esc(name)}`;
         b.onclick = () => { state.segment = name; update(); };
         tabs.appendChild(b);
       }
@@ -1348,7 +1556,7 @@
       gt.classList.toggle("active", state.showGsc);
       gt.setAttribute("aria-pressed", state.showGsc);
     }
-    function update() { writeHash(); renderTabs(); renderPeriods(); renderViews(); renderHint(); render(); }
+    function update() { document.body.classList.toggle("rbx", state.segment === "Roblox"); writeHash(); renderTabs(); renderPeriods(); renderViews(); renderHint(); render(); }
 
     function bindControls() {
       let t;
@@ -1404,6 +1612,7 @@
       WEEK = step; GRID = buildGrid(); ITEMS = buildItems();
       return { DATA, GRID, ITEMS };
     };
+    RBX = await getJSON("data/roblox.json");
     MODES.week = { ...pack(results, WEEK_MS), REV: await getJSON("data/revenue.json"), GSC: await getJSON("data/gsc.json") };
     if (daily.some(([, d]) => d && (d.items || []).length))
       MODES.day = { ...pack(daily, DAY_MS), REV: await getJSON("data/revenue-daily.json"), GSC: await getJSON("data/gsc-daily.json") };
