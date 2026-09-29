@@ -399,6 +399,42 @@
     .rbx-seg { display: flex; gap: 2px; background: var(--panel-2); border-radius: 7px; padding: 2px; margin-left: auto; }
     .rbx-seg button { background: none; border: 0; color: var(--muted); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 5px; cursor: pointer; }
     .rbx-seg button.on { background: var(--panel-3); color: #fff; }
+    /* ---------- Home ---------- */
+    body.home #gran, body.home #periods, body.home #sort, body.home #cmpbtn, body.home #gsctoggle, body.home #revtoggle,
+    body.home .views, body.home .info, body.home #chips { display: none !important; }
+    .home-hero { text-align: center; padding: 34px 10px 18px; }
+    .home-hero h1 { margin: 0; font-size: 30px; font-weight: 900; letter-spacing: -.5px; }
+    .home-hero h1 .g { background: linear-gradient(90deg, var(--blue-light), var(--blue)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .home-hero p { margin: 6px 0 0; color: var(--faint); font-size: 13px; }
+    .home-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; max-width: 1240px; margin: 8px auto 0; }
+    .home-tile { text-align: left; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; cursor: pointer;
+      color: var(--text); font-family: var(--font); transition: border-color .15s, transform .15s, background .15s; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .home-tile:hover { border-color: rgba(90,168,247,.55); background: var(--panel-2); transform: translateY(-2px); }
+    .home-tile:focus-visible { outline: 2px solid var(--blue-light); outline-offset: 2px; }
+    .home-tile .top { display: flex; align-items: center; gap: 10px; }
+    .home-tile .ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: rgba(11,108,251,.14); color: var(--blue-light); flex: none; }
+    .home-tile .ico svg { width: 18px; height: 18px; }
+    .home-tile .nm { font-size: 15px; font-weight: 800; }
+    .home-tile .ct { font-size: 11px; color: var(--faint); font-weight: 700; }
+    .home-tile .arrow { margin-left: auto; color: var(--faint); font-size: 16px; }
+    .home-tile:hover .arrow { color: var(--blue-light); }
+    .home-tile .stats { display: flex; gap: 12px; font-size: 12px; font-weight: 700; }
+    .home-tile .hl { font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 9px; min-height: 36px;
+      overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .home-tile .hl b { color: var(--text); }
+    .home-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 1240px; margin: 22px auto 0; }
+    @media (max-width: 1000px) { .home-cols { grid-template-columns: 1fr; } .home-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .home-tiles { grid-template-columns: 1fr; } .home-hero h1 { font-size: 23px; } }
+    .home-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+    .home-box h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; }
+    .home-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 12.5px; cursor: pointer; min-width: 0; }
+    .home-row:first-of-type { border-top: 0; }
+    .home-row:hover .k { color: var(--blue-light); }
+    .home-row .k { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+    .home-row .s { color: var(--faint); font-size: 11px; white-space: nowrap; }
+    .home-row .rbx-ic { width: 22px; height: 22px; }
+    .home-foot { text-align: center; color: var(--faint); font-size: 11px; margin: 18px 0 0; }
+    .home-foot a { color: var(--muted); cursor: pointer; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -967,6 +1003,65 @@
       }
     }
 
+    // ---------- Home: "What would you like to see today?" ----------
+    const HOME_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2.5 11h2.8v9h5.2v-6h3v6h5.2v-9h2.8L12 3Z"/></svg>';
+    const HOME_DESC = { Accounts: "Game account demand", Currencies: "Gold, coins and in-game money", "Top Ups": "Points, gems and top-ups",
+      Items: "Skins, pets and items", "Gift Cards": "Gift card brands", Games: "The games themselves", Roblox: "Roblox charts and players" };
+    function goSeg(name, extra) { state.segment = name; if (extra) Object.assign(state, extra); update(); window.scrollTo(0, 0); }
+
+    function renderHome(content) {
+      const scored = ITEMS.map(i => ({ ...i, s: score(i.series) }));
+      const real = scored.filter(i => i.s.status !== "low" && i.s.change != null && isFinite(i.s.change));
+      const tiles = [];
+      for (const seg of DATA.segments) {
+        const list = scored.filter(i => i.segment === seg.name);
+        const up = list.filter(i => i.s.status === "rising" || i.s.status === "breakout").length;
+        const dn = list.filter(i => i.s.status === "falling").length;
+        const best = real.filter(i => i.segment === seg.name && i.s.base >= 5 && i.s.recent >= 5).sort((a, b) => b.s.change - a.s.change)[0];
+        tiles.push({ name: seg.name, icon: SEG_ICON[seg.name] || "", count: `${list.length} tracked`,
+          stats: `<span class="up">▲ ${up} rising</span><span class="down">▼ ${dn} falling</span>`,
+          hl: best && best.s.change > 0 ? `Top riser: <b>${esc(best.keyword)}</b> ${pctTxt(best.s.change)}` : "No big movers right now." });
+      }
+      if (RBX && RBX.games) {
+        const all = {}; for (const id of Object.keys(RBX.games)) all[id] = rbxStats(id);
+        const tr = (RBX.lists.trending || []).map(id => all[id]).filter(Boolean);
+        const brk = Object.values(all).filter(s => s.dPlayers != null && s.dPlayers >= 50 && s.players >= 5000).length;
+        tiles.push({ name: "Roblox", icon: RBX_ICON, count: `Top 50 Trending + Playing`,
+          stats: `<span class="up">🚀 ${brk} breaking out</span>`,
+          hl: tr[0] ? `#1 trending: <b>${esc(rbxName(tr[0].g))}</b> · ${rbxN(tr[0].players)} playing` : "" });
+      }
+      tiles.push({ name: "All", icon: SEG_ICON.All, count: `${scored.length} products`, stats: `<span class="flat">Every category in one list</span>`, hl: "Filters, compare, revenue and GSC lines." });
+
+      const rise = real.filter(i => i.s.change > 0 && i.s.recent >= 5 && i.s.base >= 5).sort((a, b) => b.s.change - a.s.change).slice(0, 6);
+      const fall = real.filter(i => i.s.change < 0 && i.s.base >= 5 && i.s.recent >= 1).sort((a, b) => a.s.change - b.s.change).slice(0, 6);
+      const row = i => `<div class="home-row" data-k="${esc(i.keyword)}" data-seg="${esc(i.segment)}"><span class="k">${esc(i.keyword)}</span><span class="s">${esc(i.segment)}</span>${pctTxt(i.s.change)}</div>`;
+      let rbxBox = "";
+      if (RBX && RBX.games) {
+        const all = {}; for (const id of Object.keys(RBX.games)) all[id] = rbxStats(id);
+        const tr = (RBX.lists.trending || []).map(id => all[id]).filter(Boolean), pl = (RBX.lists.playing || []).map(id => all[id]).filter(Boolean);
+        const ups = rbxInsights(all, tr, pl).filter(u => u.lv === "hot" || u.lv === "warn").slice(0, 4);
+        rbxBox = `<div class="home-box"><h3>⚡ Roblox updates</h3>${ups.map(u => `<div class="home-row" data-go="Roblox"><span class="k" style="white-space:normal;font-weight:500">${u.ic} ${u.h}</span></div>`).join("") || '<div class="rbx-empty">Nothing big today.</div>'}</div>`;
+      }
+      const last = GRID[GRID.length - 1];
+      content.innerHTML = `
+        <div class="home-hero"><h1>What would you like to <span class="g">see today?</span></h1>
+          <p>Search demand, sales and Roblox signals for everything we sell · latest ${state.gran === "day" ? "day" : "week"}: ${esc(last || "—")}</p></div>
+        <div class="home-tiles">${tiles.map(t => `<button class="home-tile" data-go="${esc(t.name)}">
+          <div class="top"><span class="ico">${t.icon}</span><div><div class="nm">${esc(t.name)}</div><div class="ct">${esc(HOME_DESC[t.name] || t.count)}</div></div><span class="arrow">→</span></div>
+          <div class="stats">${t.stats}</div><div class="hl">${t.hl}</div></button>`).join("")}</div>
+        <div class="home-cols">
+          <div class="home-box"><h3>📈 Rising fastest</h3>${rise.map(row).join("") || '<div class="rbx-empty">Nothing rising.</div>'}</div>
+          <div class="home-box"><h3>📉 Falling fastest</h3>${fall.map(row).join("") || '<div class="rbx-empty">Nothing falling.</div>'}</div>
+          ${rbxBox}
+        </div>
+        <p class="home-foot">Changes compare the last ${state.win.split("-")[0]} ${UNIT()} with the ${state.win.split("-")[1]} before. Tip: press / to search everything.</p>`;
+      content.querySelectorAll("[data-go]").forEach(el => el.onclick = () => goSeg(el.dataset.go));
+      content.querySelectorAll(".home-row[data-k]").forEach(el => el.onclick = () => {
+        const it = ITEMS.find(i => i.keyword === el.dataset.k && i.segment === el.dataset.seg);
+        if (it && typeof openDetail === "function") openDetail({ ...it, s: score(it.series) }); else goSeg(el.dataset.seg, { q: el.dataset.k });
+      });
+    }
+
     function renderRoblox(content) {
       if (RBX && !RBX.dropped) RBX.dropped = [];
       if (!RBX || !RBX.games) { content.innerHTML = '<div class="empty">No Roblox data yet. Run the "Roblox Games → Vercel" workflow in n8n.</div>'; return; }
@@ -1064,6 +1159,7 @@
       const content = document.getElementById("content");
       content.innerHTML = "";
       if (state.segment === "Roblox") { document.getElementById("chips").innerHTML = ""; renderRoblox(content); return; }
+      if (state.segment === "Home") { document.getElementById("chips").innerHTML = ""; if (DATA && ITEMS.length) renderHome(content); else goSeg("All"); return; }
       if (!DATA || !DATA.segments || !DATA.segments.length || !GRID.length) {
         content.innerHTML = '<div class="empty">No trend data yet. The daily workflow will populate this.</div>';
         document.getElementById("chips").innerHTML = "";
@@ -1626,12 +1722,12 @@
     function renderTabs() {
       const tabs = document.getElementById("tabs");
       tabs.innerHTML = "";
-      const names = ["All", ...DATA.segments.map(s => s.name), ...(RBX ? ["Roblox"] : [])];
+      const names = ["Home", "All", ...DATA.segments.map(s => s.name), ...(RBX ? ["Roblox"] : [])];
       if (names.length <= 2) return; // only one segment, tabs add nothing
       for (const name of names) {
         const b = document.createElement("button");
         b.className = "tab" + (name === state.segment ? " active" : "");
-        b.innerHTML = `<span class="ic">${name === "Roblox" ? RBX_ICON : SEG_ICON[name] || ""}</span>${esc(name)}`;
+        b.innerHTML = `<span class="ic">${name === "Roblox" ? RBX_ICON : name === "Home" ? HOME_ICON : SEG_ICON[name] || ""}</span>${esc(name)}`;
         b.onclick = () => { state.segment = name; update(); };
         tabs.appendChild(b);
       }
@@ -1695,7 +1791,7 @@
 
     function writeHash() {
       const p = new URLSearchParams();
-      if (state.segment !== "All") p.set("seg", state.segment);
+      if (state.segment !== "Home") p.set("seg", state.segment);
       if (state.status !== "all") p.set("status", state.status);
       if (state.q) p.set("q", state.q);
       if (state.sort !== "change_desc") p.set("sort", state.sort);
@@ -1709,7 +1805,7 @@
     }
     function readHash() {
       const p = new URLSearchParams(location.hash.slice(1));
-      state.segment = p.get("seg") || "All";
+      state.segment = p.get("seg") || (p.get("q") ? "All" : "Home");
       state.status = STATUS[p.get("status")] ? p.get("status") : "all";
       state.q = p.get("q") || "";
       state.view = p.get("v") === "table" ? "table" : "cards";
@@ -1735,7 +1831,7 @@
       gt.classList.toggle("active", state.showGsc);
       gt.setAttribute("aria-pressed", state.showGsc);
     }
-    function update() { document.body.classList.toggle("rbx", state.segment === "Roblox"); writeHash(); renderTabs(); renderPeriods(); renderViews(); renderHint(); render(); }
+    function update() { document.body.classList.toggle("rbx", state.segment === "Roblox"); document.body.classList.toggle("home", state.segment === "Home"); writeHash(); renderTabs(); renderPeriods(); renderViews(); renderHint(); render(); }
 
     function bindControls() {
       let t;
@@ -1757,7 +1853,7 @@
         if (e.key === "/" && document.activeElement.tagName !== "INPUT") { e.preventDefault(); document.getElementById("q").focus(); }
         if (e.key === "Escape" && document.activeElement.id === "q") { e.target.value = ""; state.q = ""; update(); }
       });
-      document.getElementById("q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value; update(); window.scrollTo(0, 0); }, 150); });
+      document.getElementById("q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value; if (state.q && state.segment === "Home") state.segment = "All"; update(); window.scrollTo(0, 0); }, 150); });
       document.getElementById("sort").addEventListener("change", e => {
         state.sort = e.target.value;
         // picking "fallers" with the Rising chip active shows nothing useful, so follow the intent
