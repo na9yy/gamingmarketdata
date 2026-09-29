@@ -486,10 +486,10 @@
     const CHART_WEEKS = 104;
     // Period filter: chart shows only this period, and it is compared to the same length right before it
     const PERIODS_WEEKLY = {
-      "2y":  { label: "Last 2 years",   short: "2Y",  weeks: CHART_WEEKS, win: "4-12" }, // default: full history, last 4 wks vs prior 12
-      "3m":  { label: "Last 3 months",  short: "3M",  weeks: 13, text: "3 months" },
-      "6m":  { label: "Last 6 months",  short: "6M",  weeks: 26, text: "6 months" },
-      "12m": { label: "Last 12 months", short: "12M", weeks: 52, win: "13-13" }, // 12-month chart, change = last 13 weeks vs the 13 before
+      "2y":  { label: "Last 2 years",   short: "2Y",  weeks: CHART_WEEKS, win: "4-4" }, // full history chart
+      "3m":  { label: "Last 3 months",  short: "3M",  weeks: 13, win: "4-4" },
+      "6m":  { label: "Last 6 months",  short: "6M",  weeks: 26, win: "4-4" },
+      "12m": { label: "Last 12 months", short: "12M", weeks: 52, win: "4-4" }, // 12-month chart
     };
     // Daily mode: Google Trends only gives daily points for the last ~90 days
     const PERIODS_DAILY = {
@@ -1022,14 +1022,14 @@
     }
 
     // Home always compares the last 12 months with the 12 months before (weekly data)
-    const HOME_WIN = "13-13"; // same rule as the 12M view everywhere: last 13 weeks vs the 13 before
+    const HOME_WIN = "4-4"; // rising/falling everywhere = last 4 complete weeks vs the 4 before
     function homeScore(series) {
       const w = state.win; state.win = HOME_WIN; const r = score(series); state.win = w;
       // weeks that actually had data in each 12-month half (Trends leaves gaps for small keywords)
       const ser = lastIsPartial() ? series.slice(0, -1) : series;
-      r.nRecent = ser.slice(-13).filter(v => v > 0).length;
-      r.nBase = ser.slice(-26, -13).filter(v => v > 0).length;
-      r.solid = r.nRecent >= 8 && r.nBase >= 8 && r.base >= 5;
+      r.nRecent = ser.slice(-4).filter(v => v > 0).length;
+      r.nBase = ser.slice(-8, -4).filter(v => v > 0).length;
+      r.solid = r.nRecent >= 3 && r.nBase >= 3 && r.base >= 5;
       return r;
     }
     function renderHome(content) {
@@ -1069,16 +1069,16 @@
       const last = GRID[GRID.length - 1];
       content.innerHTML = `
         <div class="home-hero"><h1>What would you like to <span class="g">see today?</span></h1>
-          <p>Search demand, sales and Roblox signals for everything we sell · <b style="color:var(--muted)">12-month view · change = last 3 months vs the 3 months before</b> · latest week: ${esc(last || "—")}</p></div>
+          <p>Search demand, sales and Roblox signals for everything we sell · <b style="color:var(--muted)">12-month view · change = last 4 weeks vs the 4 weeks before</b> · latest week: ${esc(last || "—")}</p></div>
         <div class="home-tiles">${tiles.map(t => `<button class="home-tile" data-go="${esc(t.name)}">
           <div class="top"><span class="ico">${t.icon}</span><div><div class="nm">${esc(t.name)}</div><div class="ct">${esc(HOME_DESC[t.name] || t.count)}</div></div><span class="arrow">→</span></div>
           <div class="stats">${t.stats}</div><div class="hl">${t.hl}</div></button>`).join("")}</div>
         <div class="home-cols">
-          <div class="home-box"><h3>📈 Rising fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· last 3M vs prior 3M</span></h3>${rise.map(row).join("") || '<div class="rbx-empty">Nothing rising.</div>'}</div>
-          <div class="home-box"><h3>📉 Falling fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· last 3M vs prior 3M</span></h3>${fall.map(row).join("") || '<div class="rbx-empty">Nothing falling.</div>'}</div>
+          <div class="home-box"><h3>📈 Rising fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· last 4W vs prior 4W</span></h3>${rise.map(row).join("") || '<div class="rbx-empty">Nothing rising.</div>'}</div>
+          <div class="home-box"><h3>📉 Falling fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· last 4W vs prior 4W</span></h3>${fall.map(row).join("") || '<div class="rbx-empty">Nothing falling.</div>'}</div>
           ${rbxBox}
         </div>
-        <p class="home-foot">All % changes = average Google Trends interest in the last 13 weeks vs the 13 weeks before, the same rule as the 12M view inside every tab. A spike earlier in the year no longer counts as rising. Keywords need data in most of both windows, so tiny keywords cannot fake a move. Opening a category keeps the 12-month view. Tip: press / to search everything.</p>`;
+        <p class="home-foot">All % changes = average Google Trends interest in the last 4 complete weeks vs the 4 weeks before, the same rule in every tab and chart range. The current, still-counting week is left out. Keywords need data in most of both windows, so tiny keywords cannot fake a move. Opening a category keeps the 12-month view. Tip: press / to search everything.</p>`;
       content.querySelectorAll("[data-go]").forEach(el => el.onclick = () => goSeg(el.dataset.go));
       content.querySelectorAll(".home-row[data-k]").forEach(el => el.onclick = () => {
         const it = ITEMS.find(i => i.keyword === el.dataset.k && i.segment === el.dataset.seg);
