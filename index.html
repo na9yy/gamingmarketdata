@@ -489,7 +489,7 @@
       "2y":  { label: "Last 2 years",   short: "2Y",  weeks: CHART_WEEKS, win: "4-12" }, // default: full history, last 4 wks vs prior 12
       "3m":  { label: "Last 3 months",  short: "3M",  weeks: 13, text: "3 months" },
       "6m":  { label: "Last 6 months",  short: "6M",  weeks: 26, text: "6 months" },
-      "12m": { label: "Last 12 months", short: "12M", weeks: 52, text: "12 months" },
+      "12m": { label: "Last 12 months", short: "12M", weeks: 52, win: "13-13" }, // 12-month chart, change = last 13 weeks vs the 13 before
     };
     // Daily mode: Google Trends only gives daily points for the last ~90 days
     const PERIODS_DAILY = {
@@ -498,7 +498,7 @@
       "30d": { label: "Last 30 days", short: "30D", weeks: 30, text: "30 days" },
     };
     let PERIODS = PERIODS_WEEKLY;
-    let START_PERIOD = "3m";            // view the page opens with (weekly). Daily opens on 90D
+    let START_PERIOD = "12m";            // view the page opens with (weekly). Daily opens on 90D
     let DEFAULT_PERIOD = "2y";          // weekly default: last 4 weeks vs prior 12 ("90d" in Daily mode)
     const U = () => state.gran === "day" ? "d" : "w";           // unit for labels
     const UNIT = () => state.gran === "day" ? "days" : "weeks";
@@ -580,8 +580,15 @@
       return items;
     }
 
+    // The newest week (or day) is still being counted by Google Trends and often shows 0, so leave it out of the comparison
+    function lastIsPartial() {
+      const last = GRID[GRID.length - 1]; if (!last) return false;
+      const span = state.gran === "day" ? 864e5 : 7 * 864e5;
+      return Date.now() - Date.parse(last) < span;
+    }
     function score(series) {
       const [rN, bN] = state.win.split("-").map(Number);
+      series = lastIsPartial() ? series.slice(0, -1) : series;
       const recentArr = series.slice(-rN);
       const baseArr = series.slice(-(rN + bN), -rN);
       const recent = avg(recentArr), base = avg(baseArr);
@@ -670,7 +677,7 @@
           borderWidth: 2, fill: true, tension: 0.25,
           pointRadius: pts.length <= 13 ? 3 : 0, pointBackgroundColor: color, pointBorderWidth: 0,
           // default view: dim everything before the "recent" window so the comparison is visible
-          segment: state.period === DEFAULT_PERIOD
+          segment: PERIODS[state.period].win
             ? { borderColor: c => c.p1DataIndex >= pts.length - Number(state.win.split("-")[0]) ? color : color + "66" }
             : {},
         }, ...(card._item.rev ? [{
@@ -709,7 +716,7 @@
       const wrap = document.createElement("div"); wrap.className = "tbl-wrap";
       const hasRev = list.some(i => i.rev), hasGsc = list.some(i => i.gsc);
       const extra = [...(hasRev ? [{ key: null, label: "Search↔Rev r", w: 11 }] : []),
-        ...(hasGsc ? [{ key: null, label: `Clicks ${state.period === DEFAULT_PERIOD ? "4w" : PERIODS[state.period].short}`, w: 9 }, { key: null, label: "CTR", w: 6 }, { key: null, label: "Pos", w: 7 }] : [])];
+        ...(hasGsc ? [{ key: null, label: `Clicks ${PERIODS[state.period].win ? state.win.split("-")[0] + U() : PERIODS[state.period].short}`, w: 9 }, { key: null, label: "CTR", w: 6 }, { key: null, label: "Pos", w: 7 }] : [])];
       const cols = [...COLS.slice(0, 6), ...extra, COLS[6]];
       const baseW = [32, 11, 8, 10, 10, 11], extraW = extra.reduce((s, c) => s + c.w, 0);
       const scale = (100 - 18 - extraW) / baseW.reduce((s, v) => s + v, 0);
@@ -1015,13 +1022,14 @@
     }
 
     // Home always compares the last 12 months with the 12 months before (weekly data)
-    const HOME_WIN = "52-52";
+    const HOME_WIN = "13-13"; // same rule as the 12M view everywhere: last 13 weeks vs the 13 before
     function homeScore(series) {
       const w = state.win; state.win = HOME_WIN; const r = score(series); state.win = w;
       // weeks that actually had data in each 12-month half (Trends leaves gaps for small keywords)
-      r.nRecent = series.slice(-52).filter(v => v > 0).length;
-      r.nBase = series.slice(-104, -52).filter(v => v > 0).length;
-      r.solid = r.nRecent >= 26 && r.nBase >= 26 && r.base >= 5;
+      const ser = lastIsPartial() ? series.slice(0, -1) : series;
+      r.nRecent = ser.slice(-13).filter(v => v > 0).length;
+      r.nBase = ser.slice(-26, -13).filter(v => v > 0).length;
+      r.solid = r.nRecent >= 8 && r.nBase >= 8 && r.base >= 5;
       return r;
     }
     function renderHome(content) {
@@ -1061,16 +1069,16 @@
       const last = GRID[GRID.length - 1];
       content.innerHTML = `
         <div class="home-hero"><h1>What would you like to <span class="g">see today?</span></h1>
-          <p>Search demand, sales and Roblox signals for everything we sell · <b style="color:var(--muted)">last 12 months vs the 12 months before</b> · latest week: ${esc(last || "—")}</p></div>
+          <p>Search demand, sales and Roblox signals for everything we sell · <b style="color:var(--muted)">12-month view · change = last 3 months vs the 3 months before</b> · latest week: ${esc(last || "—")}</p></div>
         <div class="home-tiles">${tiles.map(t => `<button class="home-tile" data-go="${esc(t.name)}">
           <div class="top"><span class="ico">${t.icon}</span><div><div class="nm">${esc(t.name)}</div><div class="ct">${esc(HOME_DESC[t.name] || t.count)}</div></div><span class="arrow">→</span></div>
           <div class="stats">${t.stats}</div><div class="hl">${t.hl}</div></button>`).join("")}</div>
         <div class="home-cols">
-          <div class="home-box"><h3>📈 Rising fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· 12 months</span></h3>${rise.map(row).join("") || '<div class="rbx-empty">Nothing rising.</div>'}</div>
-          <div class="home-box"><h3>📉 Falling fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· 12 months</span></h3>${fall.map(row).join("") || '<div class="rbx-empty">Nothing falling.</div>'}</div>
+          <div class="home-box"><h3>📈 Rising fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· last 3M vs prior 3M</span></h3>${rise.map(row).join("") || '<div class="rbx-empty">Nothing rising.</div>'}</div>
+          <div class="home-box"><h3>📉 Falling fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· last 3M vs prior 3M</span></h3>${fall.map(row).join("") || '<div class="rbx-empty">Nothing falling.</div>'}</div>
           ${rbxBox}
         </div>
-        <p class="home-foot">All % changes = average Google Trends interest in the last 12 months vs the 12 months before. Only keywords with data in at least half the weeks of both years count, so new or tiny keywords cannot fake a spike. Opening a category keeps the 12-month view. Tip: press / to search everything.</p>`;
+        <p class="home-foot">All % changes = average Google Trends interest in the last 13 weeks vs the 13 weeks before, the same rule as the 12M view inside every tab. A spike earlier in the year no longer counts as rising. Keywords need data in most of both windows, so tiny keywords cannot fake a move. Opening a category keeps the 12-month view. Tip: press / to search everything.</p>`;
       content.querySelectorAll("[data-go]").forEach(el => el.onclick = () => goSeg(el.dataset.go));
       content.querySelectorAll(".home-row[data-k]").forEach(el => el.onclick = () => {
         const it = ITEMS.find(i => i.keyword === el.dataset.k && i.segment === el.dataset.seg);
@@ -1305,7 +1313,7 @@
     function gscLine(g) {
       const st = gscStats(g, state.period);
       if (!st) return "";
-      const p = PERIODS[state.period], lbl = state.period === DEFAULT_PERIOD ? `${st.n}${U()}` : p.short;
+      const p = PERIODS[state.period], lbl = p.win ? `${st.n}${U()}` : p.short;
       const chg = st.chg == null ? "" : `<span class="${st.chg > 5 ? "up" : st.chg < -5 ? "down" : ""}">${st.chg >= 0 ? "▲" : "▼"}${Math.abs(st.chg).toFixed(0)}%</span>`;
       const dp = st.pos != null && st.posPrev != null ? st.posPrev - st.pos : null;
       const pos = st.pos == null ? "—" : st.pos.toFixed(1) + (dp == null || Math.abs(dp) < 0.1 ? "" : ` <span class="${dp > 0 ? "up" : "down"}">${dp > 0 ? "▲" : "▼"}${Math.abs(dp).toFixed(1)}</span>`);
@@ -1383,7 +1391,7 @@
       const losing = count("losing");
       const rowsAll = dvFilter === "all" ? all : all.filter(x => x.d.verdict === dvFilter);
       const rows = dvShowAll ? rowsAll : rowsAll.slice(0, DV.rows);
-      const p = PERIODS[state.period], lbl = state.period === DEFAULT_PERIOD ? (() => { const [a, b] = state.win.split("-"); return `last ${a} ${UNIT()} vs the ${b} before`; })() : `${p.label.toLowerCase()} vs the ${p.text} before`;
+      const p = PERIODS[state.period], lbl = p.win ? (() => { const [a, b] = state.win.split("-"); return `last ${a} ${UNIT()} vs the ${b} before`; })() : `${p.label.toLowerCase()} vs the ${p.text} before`;
       const box = document.createElement("section");
       const folded = missedFolded.get(), helpOpen = helpState.get();
       box.className = "missed dvv" + (losing ? "" : " ok") + (folded ? " folded" : "");
@@ -1531,7 +1539,7 @@
       box.hidden = !st;
       if (!st) return;
       const p = PERIODS[periodKey];
-      const lbl = periodKey === DEFAULT_PERIOD ? `${st.n}${U()}` : p.short;
+      const lbl = p.win ? `${st.n}${U()}` : p.short;
       const dp = st.pos != null && st.posPrev != null ? st.posPrev - st.pos : null;
       document.getElementById("d-gsc-stats").innerHTML = `
         <div class="d-stat gsc-tag"><span>Search Console</span><b>${lbl}</b></div>
@@ -1570,8 +1578,8 @@
       const [rN, bN] = (PERIODS[detail.period].win || `${w}-${w}`).split("-");
       document.getElementById("d-stats").innerHTML = `
         <div class="d-stat"><span>Latest ${state.gran === "day" ? "day" : "week"}</span><b>${s.latest}</b></div>
-        <div class="d-stat"><span>Avg last ${detail.period === DEFAULT_PERIOD ? rN + U() : p.short}</span><b>${s.recent.toFixed(1)}</b></div>
-        <div class="d-stat"><span>Avg prior ${detail.period === DEFAULT_PERIOD ? bN + U() : p.short}</span><b>${s.base.toFixed(1)}</b></div>
+        <div class="d-stat"><span>Avg last ${p.win ? rN + U() : p.short}</span><b>${s.recent.toFixed(1)}</b></div>
+        <div class="d-stat"><span>Avg prior ${p.win ? bN + U() : p.short}</span><b>${s.base.toFixed(1)}</b></div>
         <div class="d-stat"><span>Change</span><span class="badge ${s.status}">${fmtChange(s)}</span></div>
         ${r != null ? `<div class="d-stat"><span>Search ↔ revenue</span>${corrLabel(r)}</div>` : ""}`;
       // selector chips
@@ -1754,7 +1762,7 @@
       const [rN, bN] = state.win.split("-");
       const last = GRID[GRID.length - 1];
       document.getElementById("hint").textContent =
-        (state.period === DEFAULT_PERIOD
+        (p.win
           ? `Charts show the ${p.label.toLowerCase()} (${state.gran === "day" ? "daily" : "weekly"} data). Change compares avg interest in the last ${rN} ${UNIT()} to the ${bN} ${UNIT()} before. `
           : `Charts show the ${p.label.toLowerCase()} (${state.gran === "day" ? "daily" : "weekly"} data). Change compares its avg interest to the ${p.text} before. `) +
         `Rising/Falling = change beyond ±${state.thr}%. Breakout = zero before, active now. ` +
@@ -1770,7 +1778,7 @@
       MIN_ACTIVE_WEEKS = g === "day" ? 5 : 3;
       PERIODS = g === "day" ? PERIODS_DAILY : PERIODS_WEEKLY;
       DEFAULT_PERIOD = g === "day" ? "90d" : "2y";
-      START_PERIOD = g === "day" ? "90d" : "3m";
+      START_PERIOD = g === "day" ? "90d" : "12m";
       setPeriod(keepPeriod && PERIODS[state.period] ? state.period : START_PERIOD);
       const gb = document.getElementById("gran");
       gb.hidden = !MODES.day;
@@ -1786,7 +1794,7 @@
 
     function compareText(s) {
       const p = PERIODS[state.period];
-      if (state.period === DEFAULT_PERIOD) {
+      if (p.win) {
         const [rN, bN] = state.win.split("-");
         return `${rN}${U()} avg <b>${s.recent.toFixed(1)}</b> · prior ${bN}${U()} <b>${s.base.toFixed(1)}</b>`;
       }
