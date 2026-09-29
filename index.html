@@ -1007,17 +1007,33 @@
     const HOME_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2.5 11h2.8v9h5.2v-6h3v6h5.2v-9h2.8L12 3Z"/></svg>';
     const HOME_DESC = { Accounts: "Game account demand", Currencies: "Gold, coins and in-game money", "Top Ups": "Points, gems and top-ups",
       Items: "Skins, pets and items", "Gift Cards": "Gift card brands", Games: "The games themselves", Roblox: "Roblox charts and players" };
-    function goSeg(name, extra) { state.segment = name; if (extra) Object.assign(state, extra); update(); window.scrollTo(0, 0); }
+    function goSeg(name, extra) {
+      const fromHome = state.segment === "Home";
+      state.segment = name; if (extra) Object.assign(state, extra);
+      if (fromHome && name !== "Roblox" && state.gran !== "day") setPeriod("12m"); // keep the same 12-month view you saw on Home
+      update(); window.scrollTo(0, 0);
+    }
 
+    // Home always compares the last 12 months with the 12 months before (weekly data)
+    const HOME_WIN = "52-52";
+    function homeScore(series) {
+      const w = state.win; state.win = HOME_WIN; const r = score(series); state.win = w;
+      // weeks that actually had data in each 12-month half (Trends leaves gaps for small keywords)
+      r.nRecent = series.slice(-52).filter(v => v > 0).length;
+      r.nBase = series.slice(-104, -52).filter(v => v > 0).length;
+      r.solid = r.nRecent >= 26 && r.nBase >= 26 && r.base >= 5;
+      return r;
+    }
     function renderHome(content) {
-      const scored = ITEMS.map(i => ({ ...i, s: score(i.series) }));
+      if (state.gran === "day") { applyMode("week", false); }
+      const scored = ITEMS.map(i => ({ ...i, s: homeScore(i.series) }));
       const real = scored.filter(i => i.s.status !== "low" && i.s.change != null && isFinite(i.s.change));
       const tiles = [];
       for (const seg of DATA.segments) {
         const list = scored.filter(i => i.segment === seg.name);
-        const up = list.filter(i => i.s.status === "rising" || i.s.status === "breakout").length;
-        const dn = list.filter(i => i.s.status === "falling").length;
-        const best = real.filter(i => i.segment === seg.name && i.s.base >= 5 && i.s.recent >= 5).sort((a, b) => b.s.change - a.s.change)[0];
+        const up = list.filter(i => i.s.solid && i.s.status === "rising").length;
+        const dn = list.filter(i => i.s.solid && i.s.status === "falling").length;
+        const best = real.filter(i => i.segment === seg.name && i.s.solid).sort((a, b) => b.s.change - a.s.change)[0];
         tiles.push({ name: seg.name, icon: SEG_ICON[seg.name] || "", count: `${list.length} tracked`,
           stats: `<span class="up">▲ ${up} rising</span><span class="down">▼ ${dn} falling</span>`,
           hl: best && best.s.change > 0 ? `Top riser: <b>${esc(best.keyword)}</b> ${pctTxt(best.s.change)}` : "No big movers right now." });
@@ -1032,8 +1048,8 @@
       }
       tiles.push({ name: "All", icon: SEG_ICON.All, count: `${scored.length} products`, stats: `<span class="flat">Every category in one list</span>`, hl: "Filters, compare, revenue and GSC lines." });
 
-      const rise = real.filter(i => i.s.change > 0 && i.s.recent >= 5 && i.s.base >= 5).sort((a, b) => b.s.change - a.s.change).slice(0, 6);
-      const fall = real.filter(i => i.s.change < 0 && i.s.base >= 5 && i.s.recent >= 1).sort((a, b) => a.s.change - b.s.change).slice(0, 6);
+      const rise = real.filter(i => i.s.solid && i.s.change > 0).sort((a, b) => b.s.change - a.s.change).slice(0, 6);
+      const fall = real.filter(i => i.s.solid && i.s.change < 0).sort((a, b) => a.s.change - b.s.change).slice(0, 6);
       const row = i => `<div class="home-row" data-k="${esc(i.keyword)}" data-seg="${esc(i.segment)}"><span class="k">${esc(i.keyword)}</span><span class="s">${esc(i.segment)}</span>${pctTxt(i.s.change)}</div>`;
       let rbxBox = "";
       if (RBX && RBX.games) {
@@ -1045,20 +1061,20 @@
       const last = GRID[GRID.length - 1];
       content.innerHTML = `
         <div class="home-hero"><h1>What would you like to <span class="g">see today?</span></h1>
-          <p>Search demand, sales and Roblox signals for everything we sell · latest ${state.gran === "day" ? "day" : "week"}: ${esc(last || "—")}</p></div>
+          <p>Search demand, sales and Roblox signals for everything we sell · <b style="color:var(--muted)">last 12 months vs the 12 months before</b> · latest week: ${esc(last || "—")}</p></div>
         <div class="home-tiles">${tiles.map(t => `<button class="home-tile" data-go="${esc(t.name)}">
           <div class="top"><span class="ico">${t.icon}</span><div><div class="nm">${esc(t.name)}</div><div class="ct">${esc(HOME_DESC[t.name] || t.count)}</div></div><span class="arrow">→</span></div>
           <div class="stats">${t.stats}</div><div class="hl">${t.hl}</div></button>`).join("")}</div>
         <div class="home-cols">
-          <div class="home-box"><h3>📈 Rising fastest</h3>${rise.map(row).join("") || '<div class="rbx-empty">Nothing rising.</div>'}</div>
-          <div class="home-box"><h3>📉 Falling fastest</h3>${fall.map(row).join("") || '<div class="rbx-empty">Nothing falling.</div>'}</div>
+          <div class="home-box"><h3>📈 Rising fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· 12 months</span></h3>${rise.map(row).join("") || '<div class="rbx-empty">Nothing rising.</div>'}</div>
+          <div class="home-box"><h3>📉 Falling fastest <span style="color:var(--faint);font-weight:600;font-size:11px">· 12 months</span></h3>${fall.map(row).join("") || '<div class="rbx-empty">Nothing falling.</div>'}</div>
           ${rbxBox}
         </div>
-        <p class="home-foot">Changes compare the last ${state.win.split("-")[0]} ${UNIT()} with the ${state.win.split("-")[1]} before. Tip: press / to search everything.</p>`;
+        <p class="home-foot">All % changes = average Google Trends interest in the last 12 months vs the 12 months before. Only keywords with data in at least half the weeks of both years count, so new or tiny keywords cannot fake a spike. Opening a category keeps the 12-month view. Tip: press / to search everything.</p>`;
       content.querySelectorAll("[data-go]").forEach(el => el.onclick = () => goSeg(el.dataset.go));
       content.querySelectorAll(".home-row[data-k]").forEach(el => el.onclick = () => {
         const it = ITEMS.find(i => i.keyword === el.dataset.k && i.segment === el.dataset.seg);
-        if (it && typeof openDetail === "function") openDetail({ ...it, s: score(it.series) }); else goSeg(el.dataset.seg, { q: el.dataset.k });
+        if (it && typeof openDetail === "function") openDetail({ ...it, s: homeScore(it.series) }); else goSeg(el.dataset.seg, { q: el.dataset.k });
       });
     }
 
